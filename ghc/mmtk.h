@@ -5,11 +5,20 @@
 // header file (possibly based on this example with their own extension and
 // modification), and expose the Rust API based on their native API.
 
+
+// nogc would require:
+// - gc_init
+// - alloc
+// - bind_mutator
+
 #ifndef MMTK_H
 #define MMTK_H
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <cassert>
+#include <set>
+#include <iterator>
 
 #ifdef __cplusplus
 extern "C" {
