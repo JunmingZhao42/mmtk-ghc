@@ -83,6 +83,8 @@ extern void mmtk_modify_check(void* ref);
 extern bool mmtk_will_never_move(void* object);
 
 // Process an MMTk option. Return true if option was processed successfully
+/// * `name`: the name of the option. See `options!` for all the valid options.
+/// * `value`: the value of the option in string format.
 extern bool mmtk_process(char* name, char* value);
 
 // Process MMTk options. Return true if all options were processed successfully
