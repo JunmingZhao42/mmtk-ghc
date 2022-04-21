@@ -2,6 +2,7 @@ type StgWord = usize,
 type StgHalfWord = u32, // TODO: change this size later
 type StgWord16 = u16,
 type StgWord8 = u8,
+type StgInt = i64
 
 // ------------ ClosureTypes.h ------------
 #[derive(Eq)] // comparison traits
@@ -164,14 +165,16 @@ pub struct StgLargeBitmap {
 
 #[repr(C)]
 pub union StgClosureInfo {
-    pub payload : struct Payload_ {
-        pub ptrs : StgHalfWord,  /* number of pointers */
-        pub nptrs : StgHalfWord  /* number of non-pointers */
+    pub payload : {
+        ptrs : StgHalfWord,  /* number of pointers */
+        nptrs : StgHalfWord  /* number of non-pointers */
     },
 
     pub bitmap : Bitmap,
     pub selector_offset : StgWord
 }
+
+type StgClosureInfoType = StgClosureInfo;
 
 impl StgClosureInfo {
     // TODO: pattern matching read?
@@ -218,12 +221,3 @@ pub struct StgConInfoTable {
     // offset field
     pub i : StgInfoTable
 }
-
-
-
-
-
-// ------------ Closures.h ------------
-// TODO: same for closures.h
-// StgHeader
-// StgClosure
