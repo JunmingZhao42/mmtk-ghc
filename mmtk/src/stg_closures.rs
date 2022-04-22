@@ -1,6 +1,9 @@
+// TODO: add repr C to all the structs
 // ------------ Closures.h ------------
 
-// TODO: profiling header
+
+// TODO: handle when profiling case
+pub struct StgProfHeader {}
 
 // ------------ Closure headers ------------
 pub struct StgSMPThunkHeader {
@@ -8,27 +11,40 @@ pub struct StgSMPThunkHeader {
 }
 
 pub struct StgHeader {
-    pub const info : *mut StgClosureInfo,
-    // TODO: profiling header field
+    pub const info : *const StgInfoTable,
+    pub prof_header : StgProfHeader,
 }
 
 pub struct StgThunkHeader {
-    pub const info : *mut StgClosureInfo,
+    pub const info : *const StgInfoTable,
+    pub prof_header : StgProfHeader,
     pub smp : StgSMPThunkHeader,
 }
 
 // ------------ Closure types ------------
 pub struct StgClosure {
     pub header : StgHeader,
-    pub payload : *mut *mut StgClosure,
+    // pub payload : *mut *mut StgClosure,
     // TODO: maybe don't use *mut *mut
+}
+
+// TODO: other ways to do this?
+impl StgClosure {
+    pub fn get_payload(&self, i: usize) -> *mut StgClosure {
+        unimplemented!()
+        let start_payload = (self as *const StgHeader).offset(1).cast::<*const *mut StgClosure>();
+        start_payload.offset(i).deref()
+    }
 }
 
 // Closure types: THUNK, THUNK_<X>_<Y>
 pub struct StgThunk {
     pub header : StgThunkHeader,
-    pub payload : *mut *mut StgClosure,
+    // pub payload : *mut *mut StgClosure,
 }
+
+// the same impl for getting payload?
+
 
 // Closure types: THUNK_SELECTOR
 pub struct StgSelector {
