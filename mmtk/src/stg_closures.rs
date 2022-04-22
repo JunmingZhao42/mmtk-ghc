@@ -3,13 +3,17 @@
 
 
 // TODO: handle when profiling case
+#[repr(C)]
 pub struct StgProfHeader {}
 
 // ------------ Closure headers ------------
+#[repr(C)]
 pub struct StgSMPThunkHeader {
     pub pad : StgWord
 }
 
+// TODO: make correspoinding comments
+// safe way to dereference
 #[repr(C)]
 struct StgInfoTableRef (*const StgInfoTable);
 
@@ -25,11 +29,13 @@ impl StgInfoTableRef {
     }
 }
 
+#[repr(C)]
 pub struct StgHeader {
     pub info_table: StgInfoTableRef,
     pub prof_header : StgProfHeader,
 }
 
+#[repr(C)]
 pub struct StgThunkHeader {
     pub info_table : StgInfoTableRef,
     pub prof_header : StgProfHeader,
@@ -37,6 +43,7 @@ pub struct StgThunkHeader {
 }
 
 // ------------ payload ------------
+#[repr(C)]
 pub struct ClosurePayload {}
 
 // TODO: check other instances of indexing in payload
@@ -51,24 +58,28 @@ impl ClosurePayload {
 }
 
 // ------------ Closure types ------------
+#[repr(C)]
 pub struct StgClosure {
     pub header  : StgHeader,
     pub payload : ClosurePayload,
 }
 
 // Closure types: THUNK, THUNK_<X>_<Y>
+#[repr(C)]
 pub struct StgThunk {
     pub header  : StgThunkHeader,
     pub payload : ClosurePayload,
 }
 
 // Closure types: THUNK_SELECTOR
+#[repr(C)]
 pub struct StgSelector {
     pub header : StgThunkHeader,
     pub selectee : *mut StgClosure,
 }
 
 // Closure types: PAP
+#[repr(C)]
 pub struct StgPAP {
     pub header : StgHeader,
     pub arity : StgHalfWord,
@@ -78,6 +89,7 @@ pub struct StgPAP {
 }
 
 // Closure types: AP
+#[repr(C)]
 pub struct StgAP {
     pub header : StgThunkHeader,
     pub arity : StgHalfWord,
@@ -87,6 +99,7 @@ pub struct StgAP {
 }
 
 // Closure types: AP_STACK
+#[repr(C)]
 pub struct StgAP_STACK {
     pub header : StgThunkHeader,
     pub size : StgWord,
@@ -95,12 +108,14 @@ pub struct StgAP_STACK {
 }
 
 // Closure types: IND
+#[repr(C)]
 pub struct StgInd {
     pub header : StgHeader,
     pub indirectee : *mut StgClosure,
 }
 
 // Closure types: IND_STATIC
+#[repr(C)]
 pub struct StgIndStatic {
     pub header : StgHeader,
     pub indirectee : *mut StgClosure,
@@ -109,6 +124,7 @@ pub struct StgIndStatic {
 }
 
 // Closure types: BLOCKING_QUEUE
+#[repr(C)]
 pub struct StgBlockingQueue {
     pub header : StgHeader,
     pub link : *mut StgBlockingQueue,
@@ -119,6 +135,7 @@ pub struct StgBlockingQueue {
 
 // Closure types: ARR_WORDS
 // an array of bytes -- a buffer of memory
+#[repr(C)]
 pub struct StgArrBytes {
     pub header : StgHeader,
     pub bytes : StgWord, // number of bytes in payload
@@ -128,6 +145,7 @@ pub struct StgArrBytes {
 // Closure types: MUT_ARR_PTRS_CLEAN, MUT_ARR_PTRS_DIRTY,
 // MUT_ARR_PTRS_FROZEN_DIRTY, MUT_ARR_PTRS_FROZEN_CLEAN, MUT_VAR_CLEAN,
 // MUT_VAR_DIRTY
+#[repr(C)]
 pub struct StgMutArrPtrs {
     pub header : StgHeader,
     pub ptrs : StgWord,
@@ -137,6 +155,7 @@ pub struct StgMutArrPtrs {
 
 // Closure types: SMALL_MUT_ARR_PTRS_CLEAN, SMALL_MUT_ARR_PTRS_DIRTY,
 // SMALL_MUT_ARR_PTRS_FROZEN_DIRTY, SMALL_MUT_ARR_PTRS_FROZEN_CLEAN,
+#[repr(C)]
 pub struct StgSmallMutArrPtrs {
     pub header : StgHeader,
     pub ptrs : StgWord,
@@ -144,6 +163,7 @@ pub struct StgSmallMutArrPtrs {
 }
 
 // Closure types: MUT_VAR_CLEAN, MUT_VAR_DIRTY
+#[repr(C)]
 pub struct StgMutVar {
     pub header : StgHeader,
     pub var : *mut StgClosure,
@@ -153,20 +173,24 @@ pub struct StgMutVar {
 
 
 // Closure types: UPDATE_FRAME
+#[repr(C)]
 pub struct StgUpdateFrame {
     pub header : StgHeader,
     pub updatee : *mut StgClosure,
 }
 
 // Closure types: CATCH_FRAME
+#[repr(C)]
 pub struct StgCatchFrame {
     pub header : StgHeader,
     pub exceptions_blocked : StgWord,
     pub handler : *mut StgClosure,
 }
 
+#[repr(C)]
 pub struct StgStackPayload {}
 
+#[repr(C)]
 pub struct StgStack {
     pub header : StgHeader,
     pub stack_size : StgWord32,
@@ -179,17 +203,20 @@ pub struct StgStack {
 // impl walk through stack?
 
 // Closure types: UNDERFLOW_FRAME
+#[repr(C)]
 pub struct StgUnderflowFrame {
     pub info_table : StgInfoTableRef,
     pub next_chunk : *mut StgStack,
 }
 
 // Closure types: STOP_FRAME
+#[repr(C)]
 pub struct StgStopFrame {
     pub header : StgHeader,
 }
 
 // Closure types: RET_FUN
+#[repr(C)]
 pub struct StgRetFun {
     pub info_table : StgInfoTableRef,
     pub size : StgWord,
@@ -198,18 +225,21 @@ pub struct StgRetFun {
 }
 
 // Closure type: CONSTR_0_1
+#[repr(C)]
 pub struct StgIntCharlikeClosure {
     pub header : StgHeader,
     pub data : StgWord,
 }
 
 // Stable name, StableName# v
+#[repr(C)]
 pub struct StgStableName {
     pub header : StgHeader,
     pub sn : StgWord,
 }
 
 // Closure types: WEAK
+#[repr(C)]
 pub struct StgWeak {
     pub header : StgHeader,
     pub cfinalizers : *mut StgClosure,
@@ -220,6 +250,7 @@ pub struct StgWeak {
 }
 
 
+#[repr(C)]
 union FinalizerFn {
     pub without_env: *const extern "C" fn(*mut u8),
       // ^ (ptr)
@@ -228,6 +259,7 @@ union FinalizerFn {
 }
 
 // Closure type: CONSTR
+#[repr(C)]
 struct StgCFinalizerList {
     header: StgHeader,
     link: *mut StgClosure,
@@ -249,6 +281,7 @@ impl StgCFinalizer {
 }
 
 // Closure types: BCO
+#[repr(C)]
 pub struct StgBCO {
     pub header : StgHeader,
     pub instrs : *mut StgArrBytes,
@@ -286,6 +319,7 @@ impl StgBCO {
 */
 
 // which closure type?
+#[repr(C)]
 pub struct StgMVarTSOQueue {
     pub header : StgHeader,
     pub link : *mut StgMVarTSOQueue,
@@ -293,6 +327,7 @@ pub struct StgMVarTSOQueue {
 }
 
 // Closure types: MVAR_CLEAN, MVAR_DIRTY
+#[repr(C)]
 pub struct StgMVar {
     pub header : StgHeader,
     pub head : *mut StgMVarTSOQueue,
@@ -300,6 +335,7 @@ pub struct StgMVar {
     pub value : *mut StgClosure,
 }
 
+#[repr(C)]
 pub struct StgTVarWatchQueue {
     pub header : StgHeader,
     pub closure : *mut StgTSO,
@@ -307,6 +343,7 @@ pub struct StgTVarWatchQueue {
     pub prev_queue_entry : *mut StgTVarWatchQueue,
 }
 
+#[repr(C)]
 pub struct StgTVar {
     pub header : StgHeader,
     pub current_value : *mut StgClosure,
@@ -314,6 +351,7 @@ pub struct StgTVar {
     pub num_updates : StgInt,
 }
 
+#[repr(C)]
 pub struct TRecEntry {
     pub tvar : *mut StgTVar,
     pub expected_value : *mut StgClosure,
@@ -325,6 +363,7 @@ pub struct TRecEntry {
 const TREC_CHUNK_NUM_ENTRIES: i32 = 16;
 
 // contains many TRec entries and link them together
+#[repr(C)]
 pub struct StgTRecChunk {
     pub header : StgHeader,
     pub prev_chunk : *mut StgTRecChunk,
@@ -341,6 +380,7 @@ pub enum TRecState {
     TREC_WAITING,       /* Transaction currently waiting */
 }
 
+#[repr(C)]
 pub struct StgTRecHeader {
     pub header : StgHeader,
     pub enclosing_trec : *mut StgTRecHeader,
@@ -348,18 +388,21 @@ pub struct StgTRecHeader {
     pub state : TRecState,
 }
 
+#[repr(C)]
 pub struct StgAtomicallyFrame {
     pub header : StgHeader,
     pub code : *mut StgClosure,
     pub result : *mut StgClosure,
 }
 
+#[repr(C)]
 pub struct StgCatchSTMFrame {
     pub header : StgHeader,
     pub code : *mut StgClosure,
     pub handler : *mut StgClosure,
 }
 
+#[repr(C)]
 pub struct StgCatchRetryFrame {
     pub header : StgHeader,
     pub running_alt_code : StgWord,
@@ -372,17 +415,20 @@ pub struct StgCatchRetryFrame {
    Messages
    ------------------------------------------------------------------------- */
 
+#[repr(C)]
 pub struct Message {
     pub header : StgHeader,
     pub link : *mut Message,
 }
 
+#[repr(C)]
 pub struct MessageWakeup {
     pub header : StgHeader,
     pub link : *mut Message,
     pub tso : *mut StgTSO,
 }
 
+#[repr(C)]
 pub struct MessageThrowTo {
     pub header : StgHeader,
     pub link : *mut MessageThrowTo, // should be just Message ?
@@ -391,6 +437,7 @@ pub struct MessageThrowTo {
     pub exception : *mut StgClosure,
 }
 
+#[repr(C)]
 pub struct MessageBlackHole {
     pub header : StgHeader,
     pub link : *mut MessageBlackHole, // should be just Message ?
@@ -398,6 +445,7 @@ pub struct MessageBlackHole {
     pub bh : *mut StgClosure,
 }
 
+#[repr(C)]
 pub struct MessageCloneStack {
     pub header : StgHeader,
     pub link : *mut Message,
@@ -409,15 +457,17 @@ pub struct MessageCloneStack {
 /* ----------------------------------------------------------------------------
    Compact Regions
    ------------------------------------------------------------------------- */
-
+#[repr(C)]
 pub struct StgCompactNFDataBlock {
     pub self_ : *mut StgCompactNFDataBlock,
     pub owner : *mut StgCompactNFData,
     pub next : *mut StgCompactNFDataBlock,
 }
 
+#[repr(C)]
 pub struct Hashtable {}
 
+#[repr(C)]
 pub struct StgCompactNFData {
     pub header : StgHeader,
     pub totalW : StgWord,
