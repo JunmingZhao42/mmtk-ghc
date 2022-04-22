@@ -2,7 +2,10 @@ type StgWord = usize,
 type StgHalfWord = u32, // TODO: change this size later
 type StgWord16 = u16,
 type StgWord8 = u8,
-type StgInt = i64
+type StgInt = i64,
+type StgHalfInt = i32,
+type StgSRTField = StgHalfInt,
+type StgCode = StgWord8
 
 // ------------ ClosureTypes.h ------------
 #[derive(Eq)] // comparison traits
