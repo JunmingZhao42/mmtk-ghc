@@ -10,41 +10,57 @@ pub struct StgSMPThunkHeader {
     pub pad : StgWord
 }
 
+#[repr(C)]
+struct StgInfoTableRef (*const StgInfoTable);
+
+impl StgInfoTableRef {
+    pub fn get_info_table(&self) -> &'static StgInfoTable {
+        // some info table not always valid
+        // load and unload codes make info table invalid
+        if cfg!(tables_next_to_code) {
+            self.0.offset(-1)
+        } else {
+            self.0
+        }
+    }
+}
+
 pub struct StgHeader {
-    pub const info : *const StgInfoTable,
+    pub info_table: StgInfoTableRef,
     pub prof_header : StgProfHeader,
 }
 
 pub struct StgThunkHeader {
-    pub const info : *const StgInfoTable,
+    pub info_table : StgInfoTableRef,
     pub prof_header : StgProfHeader,
     pub smp : StgSMPThunkHeader,
 }
 
-// ------------ Closure types ------------
-pub struct StgClosure {
-    pub header : StgHeader,
-    // pub payload : *mut *mut StgClosure,
-    // TODO: maybe don't use *mut *mut
+// ------------ payload ------------
+pub struct ClosurePayload {}
+
+// TODO: check other instances of indexing in payload
+impl ClosurePayload {
+    pub fn get(&self, i: usize) -> *mut StgClosure {
+        unsafe {
+            let ptr: *const ClosurePayload = &*self;
+            let payload: *const *mut StgClosure = ptr.cast();
+            *payload.offset(i as isize)
+        }
+    }
 }
 
-// TODO: other ways to do this?
-impl StgClosure {
-    pub fn get_payload(&self, i: usize) -> *mut StgClosure {
-        unimplemented!()
-        let start_payload = (self as *const StgHeader).offset(1).cast::<*const *mut StgClosure>();
-        start_payload.offset(i).deref()
-    }
+// ------------ Closure types ------------
+pub struct StgClosure {
+    pub header  : StgHeader,
+    pub payload : ClosurePayload,
 }
 
 // Closure types: THUNK, THUNK_<X>_<Y>
 pub struct StgThunk {
-    pub header : StgThunkHeader,
-    // pub payload : *mut *mut StgClosure,
+    pub header  : StgThunkHeader,
+    pub payload : ClosurePayload,
 }
-
-// the same impl for getting payload?
-
 
 // Closure types: THUNK_SELECTOR
 pub struct StgSelector {
@@ -58,16 +74,16 @@ pub struct StgPAP {
     pub arity : StgHalfWord,
     pub n_args : StgHalfWord,
     pub fun : *mut StgClosure,
-    pub payload : *mut *mut StgClosure,
+    pub payload : ClosurePayload,
 }
 
 // Closure types: AP
-pub struct AP {
+pub struct StgAP {
     pub header : StgThunkHeader,
     pub arity : StgHalfWord,
     pub n_args : StgHalfWord,
     pub fun : *mut StgClosure,
-    pub payload : *mut *mut StgClosure,
+    pub payload : ClosurePayload,
 }
 
 // Closure types: AP_STACK
@@ -75,7 +91,7 @@ pub struct StgAP_STACK {
     pub header : StgThunkHeader,
     pub size : StgWord,
     pub fun : *mut StgClosure,
-    pub payload : *mut *mut StgClosure,
+    pub payload : ClosurePayload,
 }
 
 // Closure types: IND
@@ -89,7 +105,7 @@ pub struct StgIndStatic {
     pub header : StgHeader,
     pub indirectee : *mut StgClosure,
     pub static_link : *mut StgClosure,
-    pub const saved_info : *mut StgInfoTable,
+    pub saved_info_table : StgInfoTableRef,
 }
 
 // Closure types: BLOCKING_QUEUE
@@ -102,35 +118,39 @@ pub struct StgBlockingQueue {
 }
 
 // Closure types: ARR_WORDS
+// an array of bytes -- a buffer of memory
 pub struct StgArrBytes {
     pub header : StgHeader,
     pub bytes : StgWord, // number of bytes in payload
-    pub pyaload : *mut StgWord, // Why is it StgWord here not StgClosure?
+    // pub payload : *mut StgWord, // Why is it StgWord here not StgClosure?
 }
 
 // Closure types: MUT_ARR_PTRS_CLEAN, MUT_ARR_PTRS_DIRTY,
 // MUT_ARR_PTRS_FROZEN_DIRTY, MUT_ARR_PTRS_FROZEN_CLEAN, MUT_VAR_CLEAN,
 // MUT_VAR_DIRTY
-pub struct StgMutArr {
+pub struct StgMutArrPtrs {
     pub header : StgHeader,
     pub ptrs : StgWord,
     pub size : StgWord,
-    pub payload : *mut *mut StgClosure,
+    pub payload : ClosurePayload,
 }
 
 // Closure types: SMALL_MUT_ARR_PTRS_CLEAN, SMALL_MUT_ARR_PTRS_DIRTY,
 // SMALL_MUT_ARR_PTRS_FROZEN_DIRTY, SMALL_MUT_ARR_PTRS_FROZEN_CLEAN,
-pub struct StgSmallMutArr {
+pub struct StgSmallMutArrPtrs {
     pub header : StgHeader,
     pub ptrs : StgWord,
-    pub payload : *mut *mut StgClosure,
+    pub payload : ClosurePayload,
 }
 
 // Closure types: MUT_VAR_CLEAN, MUT_VAR_DIRTY
 pub struct StgMutVar {
     pub header : StgHeader,
-    pub var : *StgClosure,
+    pub var : *mut StgClosure,
 }
+
+// ------ stack frames -----------
+
 
 // Closure types: UPDATE_FRAME
 pub struct StgUpdateFrame {
@@ -145,10 +165,23 @@ pub struct StgCatchFrame {
     pub handler : *mut StgClosure,
 }
 
+pub struct StgStackPayload {}
+
+pub struct StgStack {
+    pub header : StgHeader,
+    pub stack_size : StgWord32,
+    pub dirty : StgWord8,
+    pub marking : StgWord8,
+    pub sp : *mut StgWord,
+    pub stack : StgStackPayload,
+}
+
+// impl walk through stack?
+
 // Closure types: UNDERFLOW_FRAME
 pub struct StgUnderflowFrame {
-    pub const info : *mut StgClosureInfo,
-    pub next_chunk : *mut StgStack, // TODO
+    pub info_table : StgInfoTableRef,
+    pub next_chunk : *mut StgStack,
 }
 
 // Closure types: STOP_FRAME
@@ -158,10 +191,10 @@ pub struct StgStopFrame {
 
 // Closure types: RET_FUN
 pub struct StgRetFun {
-    pub const info : *mut StgClosureInfo,
+    pub info_table : StgInfoTableRef,
     pub size : StgWord,
     pub fun : *mut StgClosure,
-    pub payload : *mut *mut StgClosure,
+    pub payload : ClosurePayload,
 }
 
 // Closure type: CONSTR_0_1
@@ -171,7 +204,6 @@ pub struct StgIntCharlikeClosure {
 }
 
 // Stable name, StableName# v
-
 pub struct StgStableName {
     pub header : StgHeader,
     pub sn : StgWord,
@@ -184,14 +216,36 @@ pub struct StgWeak {
     pub key : *mut StgClosure,
     pub value : *mut StgClosure,
     pub finalizer : *mut StgClosure,
-    pub link : *mut link,
+    pub link : *mut StgWeak,
+}
+
+
+union FinalizerFn {
+    pub without_env: *const extern "C" fn(*mut u8),
+      // ^ (ptr)
+    pub with_env: *const extern "C" fn(*mut u8, *mut u8)
+      // ^ (eptr, ptr)
 }
 
 // Closure type: CONSTR
-pub struct StgCFinalizerList {
-    pub header : StgHeader,
-    pub link : *mut StgClosure,
-    // TODO: void pointer
+struct StgCFinalizerList {
+    header: StgHeader,
+    link: *mut StgClosure,
+    finalize: FinalizerFn,
+    ptr: *mut u8,
+    eptr: *mut u8,
+    flag: StgWord,
+}
+
+impl StgCFinalizer {
+    // example of how to use
+    pub unsafe fn run(&self) {
+        match self.flag {
+            0 => (*self.finalize.without_env)(self.ptr),
+            1 => (*self.finalize.with_env)(self.eptr, self.ptr),
+            _ => panic!("oh no!")
+        }
+    }
 }
 
 // Closure types: BCO
@@ -199,12 +253,14 @@ pub struct StgBCO {
     pub header : StgHeader,
     pub instrs : *mut StgArrBytes,
     pub literals : *mut StgArrBytes,
-    pub ptrs : *mut StgMutArr,
-    pub arity : *mut StgHalfWord,
-    pub size : *mut StgHalfWord,
-    pub bitmap : StgLargeBitmap, // large bitmap = StgWord[] ?
+    pub ptrs : *mut StgMutArrPtrs,
+    pub arity : StgHalfWord,
+    pub size : StgHalfWord,
+    pub bitmap : StgLargeBitmap, // TODO: large bitmap ? check
 }
 
+/*
+TODO: have a look at BCO functions later
 impl StgBCO {
     // TODO: inline functions of StgBCO
     #[inline(always)]
@@ -227,12 +283,13 @@ impl StgBCO {
         unimplemented!()
     }
 }
+*/
 
 // which closure type?
 pub struct StgMVarTSOQueue {
     pub header : StgHeader,
     pub link : *mut StgMVarTSOQueue,
-    pub tso : *mut StgTSO, // TODO
+    pub tso : *mut StgTSO, // TODO: define TSO
 }
 
 // Closure types: MVAR_CLEAN, MVAR_DIRTY
@@ -254,25 +311,28 @@ pub struct StgTVar {
     pub header : StgHeader,
     pub current_value : *mut StgClosure,
     pub first_watch_queue_entry : *mut StgTVarWatchQueue,
-    pub num_updates : *mut StgInt,
+    pub num_updates : StgInt,
 }
 
 pub struct TRecEntry {
     pub tvar : *mut StgTVar,
     pub expected_value : *mut StgClosure,
     pub new_value : *mut StgClosure,
+    // TODO: add num_updates when THREADED_RTS
 }
 
 
-static TREC_CHUNK_NUM_ENTRIES: i32 = 5;
+const TREC_CHUNK_NUM_ENTRIES: i32 = 16;
 
+// contains many TRec entries and link them together
 pub struct StgTRecChunk {
     pub header : StgHeader,
     pub prev_chunk : *mut StgTRecChunk,
     pub next_entry_idx : StgWord,
-    pub entries : [TRecEntry; TREC_CHUNK_NUM_ENTRIES], // unsure of using Box here
+    pub entries : [TRecEntry; TREC_CHUNK_NUM_ENTRIES], 
 }
 
+// maybe don't need this
 pub enum TRecState {
     TREC_ACTIVE,        /* Transaction in progress, outcome undecided */
     TREC_CONDEMNED,     /* Transaction in progress, inconsistent / out of date reads */
@@ -325,7 +385,7 @@ pub struct MessageWakeup {
 
 pub struct MessageThrowTo {
     pub header : StgHeader,
-    pub link : *mut MessageThrowTo,
+    pub link : *mut MessageThrowTo, // should be just Message ?
     pub source : *mut StgTSO,
     pub target : *mut StgTSO,
     pub exception : *mut StgClosure,
@@ -333,8 +393,9 @@ pub struct MessageThrowTo {
 
 pub struct MessageBlackHole {
     pub header : StgHeader,
-    pub link : *mut MessageThrowTo,
+    pub link : *mut MessageBlackHole, // should be just Message ?
     pub tso : *mut StgTSO,
+    pub bh : *mut StgClosure,
 }
 
 pub struct MessageCloneStack {
@@ -350,10 +411,12 @@ pub struct MessageCloneStack {
    ------------------------------------------------------------------------- */
 
 pub struct StgCompactNFDataBlock {
-    pub self : *mut StgCompactNFDataBlock,
+    pub self_ : *mut StgCompactNFDataBlock,
     pub owner : *mut StgCompactNFData,
     pub next : *mut StgCompactNFDataBlock,
 }
+
+pub struct Hashtable {}
 
 pub struct StgCompactNFData {
     pub header : StgHeader,
@@ -363,7 +426,9 @@ pub struct StgCompactNFData {
     pub hpLim : StgPtr,
     pub nursery : *mut StgCompactNFDataBlock,
     pub last : *mut StgCompactNFDataBlock,
-    pub hash : *mut Hashtable, // TODO
+    pub hash : *mut Hashtable, // TODO: define HashTable
     pub result : *mut StgClosure,
-    pub link : *mut StgCompactNFData,
+    pub link : *mut StgCompactNFData, // maybe need to rework compact normal form
 }
+
+// TODO: test out

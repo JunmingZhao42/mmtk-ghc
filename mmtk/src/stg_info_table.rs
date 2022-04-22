@@ -1,5 +1,6 @@
 // TODO: OFFSET_FIELD
-
+// type StgSRTField = StgHalfInt,
+// type StgCode = StgWord8
 
 // ------------ InfoTables.h ------------
 
@@ -85,10 +86,24 @@ impl Bitmap {
 }
 
 
+// might want to iterate through bits
+
+pub struct LargeBitMapPayload {}
+
+impl LargeBitMapPayload {
+    pub fn get(&self, i: usize) -> *mut StgWord {
+        unsafe {
+            let ptr: *const LargeBitMapPayload = &*self;
+            let payload: *const *mut StgClosure = ptr.cast();
+            *payload.offset(i as isize)
+        }
+    }
+}
+
 #[repr(C)]
 pub struct StgLargeBitmap {
     pub size    : StgWord,
-    pub bitmap  : *const StgWord,
+    pub bitmap  : LargeBitMapPayload // similar to closure payload in stg_closures.rs
 }
 
 
@@ -148,7 +163,7 @@ pub struct StgProfInfo {} // TODO: handle profiling case
 #[repr(C)]
 pub struct StgInfoTable {
     // TODO: non TABLES_NEXT_TO_CODE
-    #[cfg(tables_next_to_code)]
+    #[cfg(not(tables_next_to_code))]
     pub code    : *const u8, // pointer to entry code
     pub prof    : StgProfInfo,
     pub layout  : StgClosureInfo,
