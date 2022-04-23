@@ -1,46 +1,44 @@
-// TODO: OFFSET_FIELD
-// type StgSRTField = StgHalfInt,
-// type StgCode = StgWord8
-
-// ------------ InfoTables.h ------------
-
-/* -----------------------------------------------------------------------------
-   Profiling info
-   -------------------------------------------------------------------------- */
-
-// pub struct StgProfInfo {
-
-// }
-
+/**
+ * GHC closure info tables in Rust
+ * Original C code is at ghc/rts/include/rts/storage/InfoTables.h
+ */
 
 /* -----------------------------------------------------------------------------
    Closure flags
    -------------------------------------------------------------------------- */
 
 #[repr(C)]
-pub struct ClosureFlag (StgWord16),
+pub struct ClosureFlag (StgWord16);
 
 impl ClosureFlag {
-    // TODO: implement Flag related macro
-    // those should be closure flags.
-    pub const _HNF : ClosureFlag = ClosureFlag(1<<0),  /* head normal form?    */
-    pub const _BTM : ClosureFlag = ClosureFlag(1<<1),  /* uses info->layout.bitmap */
-    pub const _NS  : ClosureFlag = ClosureFlag(1<<2),  /* non-sparkable        */
-    pub const _THU : ClosureFlag = ClosureFlag(1<<3),  /* thunk?               */
-    pub const _MUT : ClosureFlag = ClosureFlag(1<<4),  /* mutable?             */
-    pub const _UPT : ClosureFlag = ClosureFlag(1<<5),  /* unpointed?           */
-    pub const _SRT : ClosureFlag = ClosureFlag(1<<6),  /* has an SRT?          */
-    pub const _IND : ClosureFlag = ClosureFlag(1<<7),  /* is an indirection?   */
+    const _HNF : ClosureFlag = ClosureFlag(1<<0);  /* head normal form?    */
+    const _BTM : ClosureFlag = ClosureFlag(1<<1);  /* uses info->layout.bitmap */
+    const _NS  : ClosureFlag = ClosureFlag(1<<2);  /* non-sparkable        */
+    const _THU : ClosureFlag = ClosureFlag(1<<3);  /* thunk?               */
+    const _MUT : Closureslag = ClosureFlag(1<<4);  /* mutable?             */
+    const _UPT : ClosureFlag = ClosureFlag(1<<5);  /* unpointed?           */
+    const _SRT : ClosureFlag = ClosureFlag(1<<6);  /* has an SRT?          */
+    const _IND : ClosureFlag = ClosureFlag(1<<7);  /* is an indirection?   */
 
     #[inline(always)]
-    pub fn isMUTABLE(&self) -> bool {
-        (self & self::_MUT)
-    }
-
-    // TOOD: continue implement flags related macros
+    pub fn isMUTABLE(&self)     -> bool {(self & self::_MUT)}
 
     #[inline(always)]
-    pub fn get_closure_flags(ty : StgClosureType) -> StgWord16 {
+    pub fn isBITMAP(&self)      -> bool {(self & self::_BTM)}
+
+    #[inline(always)]
+    pub fn isTHUNK(&self)       -> bool {(self & self::_THU)}
+
+    #[inline(always)]
+    pub fn isUNPOINTED(&self)   -> bool {(self & self::_UPT)}
+
+    #[inline(always)]
+    pub fn hasSRT(&self)        -> bool {(self & self::_SRT)}
+    
+
+    // TODO: implement closure flags related macros
+    #[inline(always)]
+    pub fn get_closure_flag(c : *const StgClosure) -> ClosureFlag {
         unimplemented!()
     }
 
@@ -50,55 +48,37 @@ impl ClosureFlag {
 /* -----------------------------------------------------------------------------
    Bitmaps
    -------------------------------------------------------------------------- */
-
-pub struct StgSmallBitmap (StgWord), // rename to small bitmap
-
-// introduce Bitmap as 
+// why we use large_bitmap_offset to represent large bitmap?
 pub union Bitmap {
-    pub small_bitmap : StgSmallBitmap,
+    pub small_bitmap        : StgSmallBitmap,
     pub large_bitmap_offset : StgInt,
 }
 
-impl Bitmap {
-    // TODO: handle 32 bits constants
-    pub const BITMAP_BITS_SHIFT : StgWord = 6,
-    pub const BITMAP_SIZE_MASK : StgWord = 0x3f,
-    pub const BITMAP_BITS_SHIFT : StgWord = 6,
+#[repr(C)]
+pub struct StgSmallBitmap (StgWord);
 
-    // ----- rust style naming -----
+impl StgSmallBitmap {
+    // TODO: handle 32 bits constants
+    const BITMAP_BITS_SHIFT : StgWord = 6,
+    const BITMAP_SIZE_MASK  : StgWord = 0x3f,
+    const BITMAP_BITS_SHIFT : StgWord = 6,
 
     #[inline(always)]
-    pub fn MK_SMALL_BITMAP(size : StgWord, bit : StgWord) -> Self {
+    pub fn make_small_bitmap(size : StgWord, bit : StgWord) -> Self {
         (((bits)<<BITMAP_BITS_SHIFT) | (size))
     }
 
-    // TODO: implement bitmap related macros
-
     #[inline(always)]
     pub fn size(&self) -> StgWord {
-        unimplemented!()
+        ((self) & BITMAP_SIZE_MASK)    
     }
 
     #[inline(always)]
     pub fn bits(&self) -> StgWord {
-        unimplemented!()
+        ((self) >> BITMAP_BITS_SHIFT)
     }
 }
 
-
-// might want to iterate through bits
-
-pub struct LargeBitMapPayload {}
-
-impl LargeBitMapPayload {
-    pub fn get(&self, i: usize) -> *mut StgWord {
-        unsafe {
-            let ptr: *const LargeBitMapPayload = &*self;
-            let payload: *const *mut StgClosure = ptr.cast();
-            *payload.offset(i as isize)
-        }
-    }
-}
 
 #[repr(C)]
 pub struct StgLargeBitmap {
@@ -106,7 +86,19 @@ pub struct StgLargeBitmap {
     pub bitmap  : LargeBitMapPayload // similar to closure payload in stg_closures.rs
 }
 
+#[repr(C)]
+pub struct LargeBitMapPayload {}
 
+impl LargeBitMapPayload {
+    pub fn get_w(&self, i: usize) -> *mut StgWord {
+        unsafe {
+            let ptr: *const LargeBitMapPayload = &*self;
+            let payload: *const *mut StgClosure = ptr.cast();
+            *payload.offset(i as isize)
+        }
+    }
+    // TODO: might want to iterate through bits as well
+}
 
 #[repr(C)]
 pub struct StgLargeBitmapRef {
@@ -129,21 +121,20 @@ impl StgLargeBitmapRef {
    Info Tables
    ------------------------------------------------------------------------- */
 
-
 #[repr(C)]
 pub union StgClosureInfo {
     pub payload : {
-        ptrs : StgHalfWord,  /* number of pointers */
-        nptrs : StgHalfWord,  /* number of non-pointers */
+        ptrs    : StgHalfWord,  /* number of pointers */
+        nptrs   : StgHalfWord,  /* number of non-pointers */
     }, // declare outside
 
-    pub bitmap : StgSmallBitmap,
+    pub small_bitmap : StgSmallBitmap,
     
     // TODO: check if x64 is still related to OFFSET_FIELD
     // Check if hack in Note [x86-64-relative] is still necessary 
     pub large_bitmap : LargeBitmapRef,
 
-    pub selector_offset : StgWord
+    pub selector_offset : StgWord,
 }
 
 /* ----------------------------------------------------------------------------
@@ -175,17 +166,15 @@ pub struct StgInfoTable {
 
 #[repr(C)]
 pub struct StgFunInfoExtra {
-    pub slow_apply : StgInt,
+    pub slow_apply  : StgInt,
+    pub bitmap      : Bitmap,
 
-    pub bitmap : Bitmap,
+    // TODO: handle offset for USE_INLINE_SRT_FIELD for srtfield
 
-    // TODO: handle offset for USE_INLINE_SRT_FIELD
-    // for srtfield
-    pub fun_type : StgFunType, // in types.rs from rts/include/rts/storage/FunTypes.h
-    pub arity : StgHalfWord,
+    pub fun_type    : StgFunType, // in types.rs from rts/include/rts/storage/FunTypes.h
+    pub arity       : StgHalfWord,
     // TODO: handle non TABLES_NEXT_TO_CODE (StgFunInfoExtraFwd)
 }
-
 
 #[repr(C)]
 pub struct StgFunInfoTable {
@@ -203,15 +192,6 @@ pub struct StgRetInfoTable {
     // TODO: USE_SRT_POINTER is true
     // TODO: USE_SRT_POINTER is false but USE_SRT_OFFSET is true
     pub i : StgInfoTable, // both false case
-}
-
-// TODO: Handle non-INLINE_SRT_FIELD case
-fn get_srt_<T>(itbl: &T) -> *const StgClosure {
-    unsafe {
-        let offset: isize = self.i.srt as isize;
-        let end_of_itbl: *const u8 = (self as *const T).offset(1);
-        (end_of_itbl as *const u8).offset(offset).cast()
-    }
 }
 
 impl StgRetInfoTable {
@@ -237,6 +217,15 @@ impl StgThunkInfoTable {
     }
 }
 
+// TODO: Handle non-INLINE_SRT_FIELD case
+fn get_srt_<T>(itbl: &T) -> *const StgClosure {
+    unsafe {
+        let offset: isize = self.i.srt as isize;
+        let end_of_itbl: *const u8 = (self as *const T).offset(1);
+        (end_of_itbl as *const u8).offset(offset).cast()
+    }
+}
+
 /* -----------------------------------------------------------------------------
    Constructor info tables
    -------------------------------------------------------------------------- */
@@ -244,11 +233,7 @@ impl StgThunkInfoTable {
 pub struct StgConInfoTable {
     // TODO: handle non TABLES_NEXT_TO_CODE
     pub con_desc_offset : StgInt,
-    pub i : StgInfoTable,
-}
-
-impl StgConInfoTable {
-    pub fn get_fun_srt(&self) 
+    pub i               : StgInfoTable,
 }
 
 // TODO: implement other macros
