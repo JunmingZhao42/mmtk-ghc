@@ -1,3 +1,6 @@
+use crate::DummyVM;
+use super::types::*;
+use super::stg_closures::*;
 /**
  * GHC closure info tables in Rust
  * Original C code is at ghc/rts/include/rts/storage/InfoTables.h
@@ -15,25 +18,25 @@ impl ClosureFlag {
     const _BTM : ClosureFlag = ClosureFlag(1<<1);  /* uses info->layout.bitmap */
     const _NS  : ClosureFlag = ClosureFlag(1<<2);  /* non-sparkable        */
     const _THU : ClosureFlag = ClosureFlag(1<<3);  /* thunk?               */
-    const _MUT : Closureslag = ClosureFlag(1<<4);  /* mutable?             */
+    const _MUT : ClosureFlag = ClosureFlag(1<<4);  /* mutable?             */
     const _UPT : ClosureFlag = ClosureFlag(1<<5);  /* unpointed?           */
     const _SRT : ClosureFlag = ClosureFlag(1<<6);  /* has an SRT?          */
     const _IND : ClosureFlag = ClosureFlag(1<<7);  /* is an indirection?   */
 
     #[inline(always)]
-    pub fn isMUTABLE(&self)     -> bool {(self & self::_MUT)}
+    pub fn isMUTABLE(&self)     -> bool {(self.0) & (Self::_MUT.0) != 0}
 
     #[inline(always)]
-    pub fn isBITMAP(&self)      -> bool {(self & self::_BTM)}
+    pub fn isBITMAP(&self)      -> bool {(self.0) & (Self::_BTM.0) != 0}
 
     #[inline(always)]
-    pub fn isTHUNK(&self)       -> bool {(self & self::_THU)}
+    pub fn isTHUNK(&self)       -> bool {(self.0) & (Self::_THU.0) != 0}
 
     #[inline(always)]
-    pub fn isUNPOINTED(&self)   -> bool {(self & self::_UPT)}
+    pub fn isUNPOINTED(&self)   -> bool {(self.0) & (Self::_UPT.0) != 0}
 
     #[inline(always)]
-    pub fn hasSRT(&self)        -> bool {(self & self::_SRT)}
+    pub fn hasSRT(&self)        -> bool {(self.0) & (Self::_SRT.0) != 0}
     
 
     // TODO: implement closure flags related macros
@@ -48,37 +51,38 @@ impl ClosureFlag {
 /* -----------------------------------------------------------------------------
    Bitmaps
    -------------------------------------------------------------------------- */
-// why we use large_bitmap_offset to represent large bitmap?
 pub union Bitmap {
     pub small_bitmap        : StgSmallBitmap,
-    pub large_bitmap_offset : StgInt,
+    pub large_bitmap_ref   : StgLargeBitmapRef,
 }
 
+// -------------------- small bitmap --------------------
 #[repr(C)]
 pub struct StgSmallBitmap (StgWord);
 
 impl StgSmallBitmap {
     // TODO: handle 32 bits constants
-    const BITMAP_BITS_SHIFT : StgWord = 6,
-    const BITMAP_SIZE_MASK  : StgWord = 0x3f,
-    const BITMAP_BITS_SHIFT : StgWord = 6,
+    const BITMAP_BITS_SHIFT : StgWord = 6;
+    const BITMAP_SIZE_MASK  : StgWord = 0x3f;
+    // const BITMAP_BITS_SHIFT : StgWord = 6;
 
     #[inline(always)]
-    pub fn make_small_bitmap(size : StgWord, bit : StgWord) -> Self {
-        (((bits)<<BITMAP_BITS_SHIFT) | (size))
+    pub fn make_small_bitmap(size : StgWord, bits : StgWord) -> Self {
+        StgSmallBitmap(((bits) << Self::BITMAP_BITS_SHIFT) | (size))
     }
 
     #[inline(always)]
     pub fn size(&self) -> StgWord {
-        ((self) & BITMAP_SIZE_MASK)    
+        (self.0) & Self::BITMAP_SIZE_MASK 
     }
 
     #[inline(always)]
     pub fn bits(&self) -> StgWord {
-        ((self) >> BITMAP_BITS_SHIFT)
+        (self.0) >> Self::BITMAP_BITS_SHIFT
     }
 }
 
+// -------------------- large bitmap --------------------
 
 #[repr(C)]
 pub struct StgLargeBitmap {
@@ -90,7 +94,7 @@ pub struct StgLargeBitmap {
 pub struct LargeBitMapPayload {}
 
 impl LargeBitMapPayload {
-    pub fn get_w(&self, i: usize) -> *mut StgWord {
+    pub fn get_w(&self, i: usize) -> *mut StgClosure {
         unsafe {
             let ptr: *const LargeBitMapPayload = &*self;
             let payload: *const *mut StgClosure = ptr.cast();
@@ -109,7 +113,7 @@ pub struct StgLargeBitmapRef {
 impl StgLargeBitmapRef {
     pub fn deref(&self, itbl: &StgInfoTable) -> *const StgLargeBitmap {
         unsafe {
-            let offset: isize = self.layout.large_bitmap as isize;
+            let offset: isize = itbl.layout.large_bitmap as isize;
             let end_of_itbl: *const u8 = (self as *const T).offset(1);
             (end_of_itbl as *const u8).offset(offset).cast()
         }
@@ -120,19 +124,21 @@ impl StgLargeBitmapRef {
 /* ----------------------------------------------------------------------------
    Info Tables
    ------------------------------------------------------------------------- */
+#[repr(C)]
+pub struct StgPointerFirst {
+    ptrs    : StgHalfWord,  /* number of pointers */
+    nptrs   : StgHalfWord,  /* number of non-pointers */
+}
 
 #[repr(C)]
 pub union StgClosureInfo {
-    pub payload : {
-        ptrs    : StgHalfWord,  /* number of pointers */
-        nptrs   : StgHalfWord,  /* number of non-pointers */
-    }, // declare outside
+    pub payload : StgPointerFirst,
 
     pub small_bitmap : StgSmallBitmap,
     
     // TODO: check if x64 is still related to OFFSET_FIELD
     // Check if hack in Note [x86-64-relative] is still necessary 
-    pub large_bitmap : LargeBitmapRef,
+    pub large_bitmap : StgLargeBitmapRef,
 
     pub selector_offset : StgWord,
 }
@@ -196,8 +202,17 @@ pub struct StgRetInfoTable {
 
 impl StgRetInfoTable {
     pub fn get_srt(&self) -> *const StgClosure {
-        get_srt_(self)
+        unsafe {
+            offset_from_end(self, self.i.srt as isize)
+        }
     }
+}
+
+/// Compute a pointer to a structure from an offset relative
+/// to the end of another structure.
+unsafe fn offset_from_end<Src, Target>(ptr: &Src, offset: isize) -> *const Target {
+    let end: *const u8 = (ptr).offset(1);
+    (end as *const u8).offset(offset).cast()
 }
 
 /* -----------------------------------------------------------------------------
@@ -213,14 +228,18 @@ pub struct StgThunkInfoTable {
 
 impl StgThunkInfoTable {
     pub fn get_srt(&self) -> *const StgClosure {
-        get_srt_(self)
+        unsafe {
+            let offset: isize = self.i.srt;
+            let end_of_itbl: *const u8 = (self as *const T).offset(1);
+            (end_of_itbl as *const u8).offset(offset).cast()
+        }
     }
 }
 
 // TODO: Handle non-INLINE_SRT_FIELD case
 fn get_srt_<T>(itbl: &T) -> *const StgClosure {
     unsafe {
-        let offset: isize = self.i.srt as isize;
+        let offset: isize = itbl.i.srt as isize;
         let end_of_itbl: *const u8 = (self as *const T).offset(1);
         (end_of_itbl as *const u8).offset(offset).cast()
     }

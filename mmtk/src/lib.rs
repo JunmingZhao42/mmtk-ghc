@@ -1,4 +1,5 @@
 #![feature(const_fn_trait_bound)] // for static fixtures
+#![feature(untagged_unions)]
 
 extern crate mmtk;
 extern crate libc;
@@ -14,6 +15,9 @@ pub mod object_model;
 pub mod active_plan;
 pub mod reference_glue;
 pub mod api;
+pub mod types;
+pub mod stg_closures;
+pub mod stg_info_table;
 
 #[cfg(test)]
 mod tests;

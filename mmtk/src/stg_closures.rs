@@ -1,4 +1,6 @@
-// TODO: add repr C to all the structs
+use crate::DummyVM;
+use super::types::*;
+use super::stg_info_table::*;
 // ------------ Closures.h ------------
 
 
@@ -18,7 +20,7 @@ pub struct StgSMPThunkHeader {
 struct StgInfoTableRef (*const StgInfoTable);
 
 impl StgInfoTableRef {
-    pub fn get_info_table(&self) -> &'static StgInfoTable {
+    pub fn get_info_table(&self) -> *const StgInfoTable {
         // some info table not always valid
         // load and unload codes make info table invalid
         if cfg!(tables_next_to_code) {
@@ -130,8 +132,48 @@ pub struct StgBlockingQueue {
     pub link : *mut StgBlockingQueue,
     pub bh : *mut StgClosure,
     pub owner : *mut StgTSO, // TODO: StgTSO
-    pub queue: *mut MessageBlackHole,
+    pub queue : *mut MessageBlackHole,
 }
+
+#[repr(C)]
+pub struct StgTSO {
+    pub header : StgHeader,
+    pub link : *mut StgTSO,
+    pub global_link : *mut StgTSO,
+    pub tso_link_prev : *mut StgTSO,
+    pub tso_link_next : *mut StgTSO,
+    pub stackobj : *mut StgStack,
+    pub what_next : StgTSONext, // in types.rs
+    pub why_blocked : StgTSOBlocked,  // in types.rs
+    pub flags : StgTSOFlag,   // in types.rs
+    pub block_info : StgTSOBlockInfo,
+    pub id : StgThreadID, 
+    pub saved_errno : StgWord32,
+    pub dirty : StgWord32,
+    pub bound : *mut  InCall,
+    pub cap : *mut Capability,
+    pub trec : *mut StgTRecHeader,
+    pub blocked_exceptions : *mut MessageThrowTo,
+    pub blocking_queue : *mut StgBlockingQueue,
+    pub alloc_limit : StgInt64,
+    pub tot_stack_size : StgWord32,
+
+    // TODO: handle TICKY_TICKY, PROFILING, mingw32_HOST_OS
+}
+
+#[repr(C)]
+pub struct StgThreadID(StgWord64);
+
+// TODO: here are some dummy structs to complete fields in TSO
+#[repr(C)]
+pub struct InCall {}
+
+#[repr(C)]
+pub struct StgTSOBlockInfo{}
+
+#[repr(C)]
+pub struct Capability {}
+
 
 // Closure types: ARR_WORDS
 // an array of bytes -- a buffer of memory
@@ -260,7 +302,7 @@ union FinalizerFn {
 
 // Closure type: CONSTR
 #[repr(C)]
-struct StgCFinalizerList {
+pub struct StgCFinalizerList {
     header: StgHeader,
     link: *mut StgClosure,
     finalize: FinalizerFn,
@@ -269,7 +311,7 @@ struct StgCFinalizerList {
     flag: StgWord,
 }
 
-impl StgCFinalizer {
+impl StgCFinalizerList {
     // example of how to use
     pub unsafe fn run(&self) {
         match self.flag {
@@ -360,7 +402,7 @@ pub struct TRecEntry {
 }
 
 
-const TREC_CHUNK_NUM_ENTRIES: i32 = 16;
+const TREC_CHUNK_NUM_ENTRIES: usize = 16;
 
 // contains many TRec entries and link them together
 #[repr(C)]
@@ -373,11 +415,11 @@ pub struct StgTRecChunk {
 
 // maybe don't need this
 pub enum TRecState {
-    TREC_ACTIVE,        /* Transaction in progress, outcome undecided */
-    TREC_CONDEMNED,     /* Transaction in progress, inconsistent / out of date reads */
-    TREC_COMMITTED,     /* Transaction has committed, now updating tvars */
-    TREC_ABORTED,       /* Transaction has aborted, now reverting tvars */
-    TREC_WAITING,       /* Transaction currently waiting */
+    TrecActive,        /* Transaction in progress, outcome undecided */
+    TrecCondemned,     /* Transaction in progress, inconsistent / out of date reads */
+    TrecCommitted,     /* Transaction has committed, now updating tvars */
+    TrecAborted,       /* Transaction has aborted, now reverting tvars */
+    TrecWaiting,       /* Transaction currently waiting */
 }
 
 #[repr(C)]
@@ -481,4 +523,4 @@ pub struct StgCompactNFData {
     pub link : *mut StgCompactNFData, // maybe need to rework compact normal form
 }
 
-// TODO: test out
+// TODO: test with some typical haskell objects for object scanning
