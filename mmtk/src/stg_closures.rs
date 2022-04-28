@@ -1,4 +1,4 @@
-use crate::DummyVM;
+// use crate::DummyVM;
 use super::types::*;
 use super::stg_info_table::*;
 // ------------ Closures.h ------------
@@ -17,16 +17,18 @@ pub struct StgSMPThunkHeader {
 // TODO: make correspoinding comments
 // safe way to dereference
 #[repr(C)]
-struct StgInfoTableRef (*const StgInfoTable);
+pub struct StgInfoTableRef (*const StgInfoTable);
 
 impl StgInfoTableRef {
     pub fn get_info_table(&self) -> *const StgInfoTable {
         // some info table not always valid
         // load and unload codes make info table invalid
-        if cfg!(tables_next_to_code) {
-            self.0.offset(-1)
-        } else {
-            self.0
+        unsafe {
+            if cfg!(tables_next_to_code) {
+                self.0.offset(-1)
+            } else {
+                self.0
+            }
         }
     }
 }
@@ -512,10 +514,10 @@ pub struct Hashtable {}
 #[repr(C)]
 pub struct StgCompactNFData {
     pub header : StgHeader,
-    pub totalW : StgWord,
-    pub autoBlockW : StgWord,
+    pub total_w : StgWord,
+    pub auto_block_w : StgWord,
     pub hp : StgPtr,
-    pub hpLim : StgPtr,
+    pub hp_lim : StgPtr,
     pub nursery : *mut StgCompactNFDataBlock,
     pub last : *mut StgCompactNFDataBlock,
     pub hash : *mut Hashtable, // TODO: define HashTable

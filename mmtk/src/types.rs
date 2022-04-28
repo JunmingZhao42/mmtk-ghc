@@ -1,4 +1,4 @@
-use crate::DummyVM;
+// use crate::DummyVM;
 pub type StgWord = usize;
 pub type StgPtr = *mut StgWord;
 
@@ -13,125 +13,111 @@ pub type StgHalfInt = i32;
 
 
 // ------------ ClosureTypes.h ------------
-#[derive(Eq)] // comparison traits
-pub struct StgClosureType (StgHalfWord);
-
-impl StgClosureType {
-    pub const INVALID_OBJECT                    : StgClosureType = StgClosureType( 0);
-    pub const CONSTR                            : StgClosureType = StgClosureType( 1);
-    pub const CONSTR_1_0                        : StgClosureType = StgClosureType( 2);
-    pub const CONSTR_0_1                        : StgClosureType = StgClosureType( 3);
-    pub const CONSTR_2_0                        : StgClosureType = StgClosureType( 4);
-    pub const CONSTR_1_1                        : StgClosureType = StgClosureType( 5);
-    pub const CONSTR_0_2                        : StgClosureType = StgClosureType( 6);
-    pub const CONSTR_NOCAF                      : StgClosureType = StgClosureType( 7);
-    pub const FUN                               : StgClosureType = StgClosureType( 8);
-    pub const FUN_1_0                           : StgClosureType = StgClosureType( 9);
-    pub const FUN_0_1                           : StgClosureType = StgClosureType(10);
-    pub const FUN_2_0                           : StgClosureType = StgClosureType(11);
-    pub const FUN_1_1                           : StgClosureType = StgClosureType(12);
-    pub const FUN_0_2                           : StgClosureType = StgClosureType(13);
-    pub const FUN_STATIC                        : StgClosureType = StgClosureType(14);
-    pub const THUNK                             : StgClosureType = StgClosureType(15);
-    pub const THUNK_1_0                         : StgClosureType = StgClosureType(16);
-    pub const THUNK_0_1                         : StgClosureType = StgClosureType(17);
-    pub const THUNK_2_0                         : StgClosureType = StgClosureType(18);
-    pub const THUNK_1_1                         : StgClosureType = StgClosureType(19);
-    pub const THUNK_0_2                         : StgClosureType = StgClosureType(20);
-    pub const THUNK_STATIC                      : StgClosureType = StgClosureType(21);
-    pub const THUNK_SELECTOR                    : StgClosureType = StgClosureType(22);
-    pub const BCO                               : StgClosureType = StgClosureType(23);
-    pub const AP                                : StgClosureType = StgClosureType(24);
-    pub const PAP                               : StgClosureType = StgClosureType(25);
-    pub const AP_STACK                          : StgClosureType = StgClosureType(26);
-    pub const IND                               : StgClosureType = StgClosureType(27);
-    pub const IND_STATIC                        : StgClosureType = StgClosureType(28);
-    pub const RET_BCO                           : StgClosureType = StgClosureType(29);
-    pub const RET_SMALL                         : StgClosureType = StgClosureType(30);
-    pub const RET_BIG                           : StgClosureType = StgClosureType(31);
-    pub const RET_FUN                           : StgClosureType = StgClosureType(32);
-    pub const UPDATE_FRAME                      : StgClosureType = StgClosureType(33);
-    pub const CATCH_FRAME                       : StgClosureType = StgClosureType(34);
-    pub const UNDERFLOW_FRAME                   : StgClosureType = StgClosureType(35);
-    pub const STOP_FRAME                        : StgClosureType = StgClosureType(36);
-    pub const BLOCKING_QUEUE                    : StgClosureType = StgClosureType(37);
-    pub const BLACKHOLE                         : StgClosureType = StgClosureType(38);
-    pub const MVAR_CLEAN                        : StgClosureType = StgClosureType(39);
-    pub const MVAR_DIRTY                        : StgClosureType = StgClosureType(40);
-    pub const TVAR                              : StgClosureType = StgClosureType(41);
-    pub const ARR_WORDS                         : StgClosureType = StgClosureType(42);
-    pub const MUT_ARR_PTRS_CLEAN                : StgClosureType = StgClosureType(43);
-    pub const MUT_ARR_PTRS_DIRTY                : StgClosureType = StgClosureType(44);
-    pub const MUT_ARR_PTRS_FROZEN_DIRTY         : StgClosureType = StgClosureType(45);
-    pub const MUT_ARR_PTRS_FROZEN_CLEAN         : StgClosureType = StgClosureType(46);
-    pub const MUT_VAR_CLEAN                     : StgClosureType = StgClosureType(47);
-    pub const MUT_VAR_DIRTY                     : StgClosureType = StgClosureType(48);
-    pub const WEAK                              : StgClosureType = StgClosureType(49);
-    pub const PRIM                              : StgClosureType = StgClosureType(50);
-    pub const MUT_PRIM                          : StgClosureType = StgClosureType(51);
-    pub const TSO                               : StgClosureType = StgClosureType(52);
-    pub const STACK                             : StgClosureType = StgClosureType(53);
-    pub const TREC_CHUNK                        : StgClosureType = StgClosureType(54);
-    pub const ATOMICALLY_FRAME                  : StgClosureType = StgClosureType(55);
-    pub const CATCH_RETRY_FRAME                 : StgClosureType = StgClosureType(56);
-    pub const CATCH_STM_FRAME                   : StgClosureType = StgClosureType(57);
-    pub const WHITEHOLE                         : StgClosureType = StgClosureType(58);
-    pub const SMALL_MUT_ARR_PTRS_CLEAN          : StgClosureType = StgClosureType(59);
-    pub const SMALL_MUT_ARR_PTRS_DIRTY          : StgClosureType = StgClosureType(60);
-    pub const SMALL_MUT_ARR_PTRS_FROZEN_DIRTY   : StgClosureType = StgClosureType(61);
-    pub const SMALL_MUT_ARR_PTRS_FROZEN_CLEAN   : StgClosureType = StgClosureType(62);
-    pub const COMPACT_NFDATA                    : StgClosureType = StgClosureType(63);
-    pub const N_CLOSURE_TYPES                   : StgClosureType = StgClosureType(64);
-}
-
-impl PartialEq for StgClosureType {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
+#[repr(u32)]
+#[derive(PartialEq, Eq)] // comparison traits
+#[allow(non_camel_case_types)]
+pub enum StgClosureType {
+    INVALID_OBJECT                    =  0,
+    CONSTR                            =  1,
+    CONSTR_1_0                        =  2,
+    CONSTR_0_1                        =  3,
+    CONSTR_2_0                        =  4,
+    CONSTR_1_1                        =  5,
+    CONSTR_0_2                        =  6,
+    CONSTR_NOCAF                      =  7,
+    FUN                               =  8,
+    FUN_1_0                           =  9,
+    FUN_0_1                           = 10,
+    FUN_2_0                           = 11,
+    FUN_1_1                           = 12,
+    FUN_0_2                           = 13,
+    FUN_STATIC                        = 14,
+    THUNK                             = 15,
+    THUNK_1_0                         = 16,
+    THUNK_0_1                         = 17,
+    THUNK_2_0                         = 18,
+    THUNK_1_1                         = 19,
+    THUNK_0_2                         = 20,
+    THUNK_STATIC                      = 21,
+    THUNK_SELECTOR                    = 22,
+    BCO                               = 23,
+    AP                                = 24,
+    PAP                               = 25,
+    AP_STACK                          = 26,
+    IND                               = 27,
+    IND_STATIC                        = 28,
+    RET_BCO                           = 29,
+    RET_SMALL                         = 30,
+    RET_BIG                           = 31,
+    RET_FUN                           = 32,
+    UPDATE_FRAME                      = 33,
+    CATCH_FRAME                       = 34,
+    UNDERFLOW_FRAME                   = 35,
+    STOP_FRAME                        = 36,
+    BLOCKING_QUEUE                    = 37,
+    BLACKHOLE                         = 38,
+    MVAR_CLEAN                        = 39,
+    MVAR_DIRTY                        = 40,
+    TVAR                              = 41,
+    ARR_WORDS                         = 42,
+    MUT_ARR_PTRS_CLEAN                = 43,
+    MUT_ARR_PTRS_DIRTY                = 44,
+    MUT_ARR_PTRS_FROZEN_DIRTY         = 45,
+    MUT_ARR_PTRS_FROZEN_CLEAN         = 46,
+    MUT_VAR_CLEAN                     = 47,
+    MUT_VAR_DIRTY                     = 48,
+    WEAK                              = 49,
+    PRIM                              = 50,
+    MUT_PRIM                          = 51,
+    TSO                               = 52,
+    STACK                             = 53,
+    TREC_CHUNK                        = 54,
+    ATOMICALLY_FRAME                  = 55,
+    CATCH_RETRY_FRAME                 = 56,
+    CATCH_STM_FRAME                   = 57,
+    WHITEHOLE                         = 58,
+    SMALL_MUT_ARR_PTRS_CLEAN          = 59,
+    SMALL_MUT_ARR_PTRS_DIRTY          = 60,
+    SMALL_MUT_ARR_PTRS_FROZEN_DIRTY   = 61,
+    SMALL_MUT_ARR_PTRS_FROZEN_CLEAN   = 62,
+    COMPACT_NFDATA                    = 63,
+    N_CLOSURE_TYPES                   = 64,
 }
 
 // ------------ FunTypes.h ------------
-#[derive(Eq)]
-pub struct StgFunType (StgHalfWord);
 
-impl StgFunType {
-    pub const ARG_GEN      : StgFunType = StgFunType( 0);
-    pub const ARG_GEN_BIG  : StgFunType = StgFunType( 1);
-    pub const ARG_BCO      : StgFunType = StgFunType( 2);
-    pub const ARG_NONE     : StgFunType = StgFunType( 3);
-    pub const ARG_N        : StgFunType = StgFunType( 4);
-    pub const ARG_P        : StgFunType = StgFunType( 5);
-    pub const ARG_F        : StgFunType = StgFunType( 6);
-    pub const ARG_D        : StgFunType = StgFunType( 7);
-    pub const ARG_L        : StgFunType = StgFunType( 8);
-    pub const ARG_V16      : StgFunType = StgFunType( 9);
-    pub const ARG_V32      : StgFunType = StgFunType(10);
-    pub const ARG_V64      : StgFunType = StgFunType(11);
-    pub const ARG_NN       : StgFunType = StgFunType(12);
-    pub const ARG_NP       : StgFunType = StgFunType(13);
-    pub const ARG_PN       : StgFunType = StgFunType(14);
-    pub const ARG_PP       : StgFunType = StgFunType(15);
-    pub const ARG_NNN      : StgFunType = StgFunType(16);
-    pub const ARG_NNP      : StgFunType = StgFunType(17);
-    pub const ARG_NPN      : StgFunType = StgFunType(18);
-    pub const ARG_NPP      : StgFunType = StgFunType(19);
-    pub const ARG_PNN      : StgFunType = StgFunType(20);
-    pub const ARG_PNP      : StgFunType = StgFunType(21);
-    pub const ARG_PPN      : StgFunType = StgFunType(22);
-    pub const ARG_PPP      : StgFunType = StgFunType(23);
-    pub const ARG_PPPP     : StgFunType = StgFunType(24);
-    pub const ARG_PPPPP    : StgFunType = StgFunType(25);
-    pub const ARG_PPPPPP   : StgFunType = StgFunType(26);
-    pub const ARG_PPPPPPP  : StgFunType = StgFunType(27);
-    pub const ARG_PPPPPPPP : StgFunType = StgFunType(28);
+// pub struct StgFunType (StgHalfWord);
+#[repr(u32)]
+#[derive(PartialEq, Eq, Debug)]
+#[allow(non_camel_case_types)]
+pub enum StgFunType {
+    ARG_NONE    =  3,
+    ARG_N       =  4,
+    ARG_P       =  5,
+    ARG_F       =  6,
+    ARG_D       =  7,
+    ARG_L       =  8,
+    ARG_V16     =  9,
+    ARG_V32      = 10,
+    ARG_V64      = 11,
+    ARG_NN       = 12,
+    ARG_NP       = 13,
+    ARG_PN       = 14,
+    ARG_PP       = 15,
+    ARG_NNN      = 16,
+    ARG_NNP      = 17,
+    ARG_NPN      = 18,
+    ARG_NPP      = 19,
+    ARG_PNN      = 20,
+    ARG_PNP      = 21,
+    ARG_PPN      = 22,
+    ARG_PPP      = 23,
+    ARG_PPPP     = 24,
+    ARG_PPPPP    = 25,
+    ARG_PPPPPP   = 26,
+    ARG_PPPPPPP  = 27,
+    ARG_PPPPPPPP = 28,
 }
-
-impl PartialEq for StgFunType {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
-}
-
 // ------------ TSO related constants from: rts/include/rts/Constants.h ------------
 
 /*
@@ -142,10 +128,10 @@ impl PartialEq for StgFunType {
 #[derive(Eq)] 
 pub struct StgTSONext (StgWord16);
 impl StgTSONext {
-    pub const ThreadRunGHC : StgTSONext = StgTSONext(1);       /* return to address on top of stack */
-    pub const ThreadInterpret : StgTSONext = StgTSONext(2);       /* interpret this thread */
-    pub const ThreadKilled : StgTSONext = StgTSONext(3);       /* thread has died, don't run it */
-    pub const ThreadComplete : StgTSONext = StgTSONext(4);       /* thread has finished */
+    pub const THREAD_RUN_GHC : StgTSONext = StgTSONext(1);       /* return to address on top of stack */
+    pub const THREAD_INTERPRET : StgTSONext = StgTSONext(2);       /* interpret this thread */
+    pub const THREAD_KILLED : StgTSONext = StgTSONext(3);       /* thread has died, don't run it */
+    pub const THREAD_COMPLETE : StgTSONext = StgTSONext(4);       /* thread has finished */
 }
 
 impl PartialEq for StgTSONext {
@@ -161,23 +147,23 @@ impl PartialEq for StgTSONext {
 #[derive(Eq)] 
 pub struct StgTSOBlocked (StgWord16);
 impl StgTSOBlocked {
-    pub const NotBlocked : StgTSOBlocked = StgTSOBlocked(0);
-    pub const BlockedOnMVar : StgTSOBlocked = StgTSOBlocked(1);
-    pub const BlockedOnMVarRead : StgTSOBlocked = StgTSOBlocked(14);
-    pub const BlockedOnBlackHole : StgTSOBlocked = StgTSOBlocked(2);
-    pub const BlockedOnRead : StgTSOBlocked = StgTSOBlocked(3);
-    pub const BlockedOnWrite : StgTSOBlocked = StgTSOBlocked(4);
-    pub const BlockedOnDelay : StgTSOBlocked = StgTSOBlocked(5);
-    pub const BlockedOnSTM : StgTSOBlocked = StgTSOBlocked(6);
+    pub const NOT_BLOCKED : StgTSOBlocked = StgTSOBlocked(0);
+    pub const BLOCKED_ON_MVAR : StgTSOBlocked = StgTSOBlocked(1);
+    pub const BLOCKED_ON_MVAR_READ : StgTSOBlocked = StgTSOBlocked(14);
+    pub const BLOCKED_ON_BLACK_HOLE : StgTSOBlocked = StgTSOBlocked(2);
+    pub const BLOCKED_ON_READ : StgTSOBlocked = StgTSOBlocked(3);
+    pub const BLOCKED_ON_WRITE : StgTSOBlocked = StgTSOBlocked(4);
+    pub const BLOCKED_ON_DELAY : StgTSOBlocked = StgTSOBlocked(5);
+    pub const BLOCKED_ON_STM : StgTSOBlocked = StgTSOBlocked(6);
 
     /* Win32 only: */
-    pub const BlockedOnDoProc : StgTSOBlocked = StgTSOBlocked(7);
+    pub const BLOCKED_ON_DO_PROC : StgTSOBlocked = StgTSOBlocked(7);
     /* Only relevant for THREADED_RTS: */
-    pub const BlockedOnCCall : StgTSOBlocked = StgTSOBlocked(10);
-    pub const BlockedOnCCall_Interruptible : StgTSOBlocked = StgTSOBlocked(11);
+    pub const BLOCKED_ON_CCALL : StgTSOBlocked = StgTSOBlocked(10);
+    pub const BLOCKED_ON_CCALL_INTERRUPTIBLE : StgTSOBlocked = StgTSOBlocked(11);
 
-    pub const BlockedOnMsgThrowTo : StgTSOBlocked = StgTSOBlocked(12);
-    pub const ThreadMigrating : StgTSOBlocked = StgTSOBlocked(13);
+    pub const BLOCKED_ON_MSG_THROW_TO : StgTSOBlocked = StgTSOBlocked(12);
+    pub const THREAD_MIGRATING : StgTSOBlocked = StgTSOBlocked(13);
 }
 
 impl PartialEq for StgTSOBlocked {

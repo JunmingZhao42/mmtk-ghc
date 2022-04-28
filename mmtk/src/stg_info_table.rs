@@ -1,4 +1,4 @@
-use crate::DummyVM;
+// use crate::DummyVM;
 use super::types::*;
 use super::stg_closures::*;
 /**
@@ -24,24 +24,24 @@ impl ClosureFlag {
     const _IND : ClosureFlag = ClosureFlag(1<<7);  /* is an indirection?   */
 
     #[inline(always)]
-    pub fn isMUTABLE(&self)     -> bool {(self.0) & (Self::_MUT.0) != 0}
+    pub fn is_mutable(&self)     -> bool {(self.0) & (Self::_MUT.0) != 0}
 
     #[inline(always)]
-    pub fn isBITMAP(&self)      -> bool {(self.0) & (Self::_BTM.0) != 0}
+    pub fn is_bitmap(&self)      -> bool {(self.0) & (Self::_BTM.0) != 0}
 
     #[inline(always)]
-    pub fn isTHUNK(&self)       -> bool {(self.0) & (Self::_THU.0) != 0}
+    pub fn is_thunk(&self)       -> bool {(self.0) & (Self::_THU.0) != 0}
 
     #[inline(always)]
-    pub fn isUNPOINTED(&self)   -> bool {(self.0) & (Self::_UPT.0) != 0}
+    pub fn is_unpointed(&self)   -> bool {(self.0) & (Self::_UPT.0) != 0}
 
     #[inline(always)]
-    pub fn hasSRT(&self)        -> bool {(self.0) & (Self::_SRT.0) != 0}
+    pub fn has_srt(&self)        -> bool {(self.0) & (Self::_SRT.0) != 0}
     
 
     // TODO: implement closure flags related macros
     #[inline(always)]
-    pub fn get_closure_flag(c : *const StgClosure) -> ClosureFlag {
+    pub fn get_closure_flag(_c : *const StgClosure) -> ClosureFlag {
         unimplemented!()
     }
 
@@ -113,9 +113,7 @@ pub struct StgLargeBitmapRef {
 impl StgLargeBitmapRef {
     pub fn deref(&self, itbl: &StgInfoTable) -> *const StgLargeBitmap {
         unsafe {
-            let offset: isize = itbl.layout.large_bitmap as isize;
-            let end_of_itbl: *const u8 = (self as *const T).offset(1);
-            (end_of_itbl as *const u8).offset(offset).cast()
+            offset_from_end(itbl, self.offset as isize)
         }
     }
 }
@@ -203,7 +201,7 @@ pub struct StgRetInfoTable {
 impl StgRetInfoTable {
     pub fn get_srt(&self) -> *const StgClosure {
         unsafe {
-            offset_from_end(self, self.i.srt as isize)
+            offset_from_end(self, self.i.srt.srt as isize)
         }
     }
 }
@@ -211,10 +209,9 @@ impl StgRetInfoTable {
 /// Compute a pointer to a structure from an offset relative
 /// to the end of another structure.
 unsafe fn offset_from_end<Src, Target>(ptr: &Src, offset: isize) -> *const Target {
-    let end: *const u8 = (ptr).offset(1);
+    let end = (ptr as *const Src).offset(1);
     (end as *const u8).offset(offset).cast()
 }
-
 /* -----------------------------------------------------------------------------
    Thunk info tables
    -------------------------------------------------------------------------- */
@@ -229,19 +226,8 @@ pub struct StgThunkInfoTable {
 impl StgThunkInfoTable {
     pub fn get_srt(&self) -> *const StgClosure {
         unsafe {
-            let offset: isize = self.i.srt;
-            let end_of_itbl: *const u8 = (self as *const T).offset(1);
-            (end_of_itbl as *const u8).offset(offset).cast()
+            offset_from_end(self, self.i.srt.srt as isize)
         }
-    }
-}
-
-// TODO: Handle non-INLINE_SRT_FIELD case
-fn get_srt_<T>(itbl: &T) -> *const StgClosure {
-    unsafe {
-        let offset: isize = itbl.i.srt as isize;
-        let end_of_itbl: *const u8 = (self as *const T).offset(1);
-        (end_of_itbl as *const u8).offset(offset).cast()
     }
 }
 
