@@ -14,7 +14,7 @@ pub type StgHalfInt = i32;
 
 // ------------ ClosureTypes.h ------------
 #[repr(u32)]
-#[derive(PartialEq, Eq)] // comparison traits
+#[derive(PartialEq, Eq, Debug)] // comparison traits
 #[allow(non_camel_case_types)]
 pub enum StgClosureType {
     INVALID_OBJECT                    =  0,

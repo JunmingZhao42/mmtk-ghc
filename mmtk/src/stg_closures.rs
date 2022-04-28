@@ -6,10 +6,12 @@ use super::stg_info_table::*;
 
 // TODO: handle when profiling case
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgProfHeader {}
 
 // ------------ Closure headers ------------
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgSMPThunkHeader {
     pub pad : StgWord
 }
@@ -17,6 +19,7 @@ pub struct StgSMPThunkHeader {
 // TODO: make correspoinding comments
 // safe way to dereference
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgInfoTableRef (*const StgInfoTable);
 
 impl StgInfoTableRef {
@@ -24,7 +27,7 @@ impl StgInfoTableRef {
         // some info table not always valid
         // load and unload codes make info table invalid
         unsafe {
-            if cfg!(tables_next_to_code) {
+            if true || cfg!(tables_next_to_code) {
                 self.0.offset(-1)
             } else {
                 self.0
@@ -34,12 +37,14 @@ impl StgInfoTableRef {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgHeader {
     pub info_table: StgInfoTableRef,
     pub prof_header : StgProfHeader,
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgThunkHeader {
     pub info_table : StgInfoTableRef,
     pub prof_header : StgProfHeader,
@@ -48,28 +53,74 @@ pub struct StgThunkHeader {
 
 // ------------ payload ------------
 #[repr(C)]
+#[derive(Debug)]
 pub struct ClosurePayload {}
 
 // TODO: check other instances of indexing in payload
 impl ClosurePayload {
-    pub fn get(&self, i: usize) -> *mut StgClosure {
+    pub fn get(&self, i: usize) -> TaggedClosureRef {
         unsafe {
             let ptr: *const ClosurePayload = &*self;
-            let payload: *const *mut StgClosure = ptr.cast();
+            let payload: *const TaggedClosureRef = ptr.cast();
             *payload.offset(i as isize)
         }
     }
 }
 
 // ------------ Closure types ------------
+#[derive(Debug)]
+pub enum Closure {
+    Constr(&'static StgClosure),
+    Thunk(&'static StgThunk),
+    ArrBytes(&'static StgArrBytes),
+    Fun(&'static StgClosure),
+    PartialFunApp(&'static StgPAP),
+    MVar(&'static StgMVar),
+}
+
+impl Closure{
+    pub fn from_ptr(p: *const StgClosure) -> Closure {
+        unsafe {
+            let info: &'static StgInfoTable = &*(*p).header.info_table.get_info_table();
+            use StgClosureType::*;
+            match info.type_ {
+                CONSTR | CONSTR_1_0 | CONSTR_0_1 | CONSTR_2_0 | CONSTR_1_1 | CONSTR_0_2
+                => Closure::Constr(&*(p as *const StgClosure)),
+                THUNK => Closure::Thunk(&*(p as *const StgThunk)),
+                ARR_WORDS => Closure::ArrBytes(&*(p as *const StgArrBytes)),
+
+                _ => panic!("info={:?} address={:?}", info, info as *const StgInfoTable)
+            }
+        }
+    }
+}
+
+
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgClosure {
     pub header  : StgHeader,
     pub payload : ClosurePayload,
 }
 
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct TaggedClosureRef (*mut StgClosure);
+
+impl TaggedClosureRef {
+    pub fn to_ptr(&self) -> *const StgClosure {
+        const TAG_BITS: usize = 0x7;
+        // (mmtk::util::Address::from_ptr(self.0) & !TAG_BITS).to_ptr()
+        
+        // ... or alternatively ...
+        let masked: usize = (self.0 as usize) & !TAG_BITS;
+        masked as *const StgClosure
+    }
+}
+
 // Closure types: THUNK, THUNK_<X>_<Y>
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgThunk {
     pub header  : StgThunkHeader,
     pub payload : ClosurePayload,
@@ -79,16 +130,17 @@ pub struct StgThunk {
 #[repr(C)]
 pub struct StgSelector {
     pub header : StgThunkHeader,
-    pub selectee : *mut StgClosure,
+    pub selectee : TaggedClosureRef,
 }
 
 // Closure types: PAP
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgPAP {
     pub header : StgHeader,
     pub arity : StgHalfWord,
     pub n_args : StgHalfWord,
-    pub fun : *mut StgClosure,
+    pub fun : TaggedClosureRef,
     pub payload : ClosurePayload,
 }
 
@@ -98,7 +150,7 @@ pub struct StgAP {
     pub header : StgThunkHeader,
     pub arity : StgHalfWord,
     pub n_args : StgHalfWord,
-    pub fun : *mut StgClosure,
+    pub fun : TaggedClosureRef,
     pub payload : ClosurePayload,
 }
 
@@ -107,7 +159,7 @@ pub struct StgAP {
 pub struct StgAP_STACK {
     pub header : StgThunkHeader,
     pub size : StgWord,
-    pub fun : *mut StgClosure,
+    pub fun : TaggedClosureRef,
     pub payload : ClosurePayload,
 }
 
@@ -115,15 +167,15 @@ pub struct StgAP_STACK {
 #[repr(C)]
 pub struct StgInd {
     pub header : StgHeader,
-    pub indirectee : *mut StgClosure,
+    pub indirectee : TaggedClosureRef,
 }
 
 // Closure types: IND_STATIC
 #[repr(C)]
 pub struct StgIndStatic {
     pub header : StgHeader,
-    pub indirectee : *mut StgClosure,
-    pub static_link : *mut StgClosure,
+    pub indirectee : TaggedClosureRef,
+    pub static_link : TaggedClosureRef,
     pub saved_info_table : StgInfoTableRef,
 }
 
@@ -132,12 +184,13 @@ pub struct StgIndStatic {
 pub struct StgBlockingQueue {
     pub header : StgHeader,
     pub link : *mut StgBlockingQueue,
-    pub bh : *mut StgClosure,
+    pub bh : TaggedClosureRef,
     pub owner : *mut StgTSO, // TODO: StgTSO
     pub queue : *mut MessageBlackHole,
 }
 
 #[repr(C)]
+
 pub struct StgTSO {
     pub header : StgHeader,
     pub link : *mut StgTSO,
@@ -180,6 +233,7 @@ pub struct Capability {}
 // Closure types: ARR_WORDS
 // an array of bytes -- a buffer of memory
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgArrBytes {
     pub header : StgHeader,
     pub bytes : StgWord, // number of bytes in payload
@@ -210,7 +264,7 @@ pub struct StgSmallMutArrPtrs {
 #[repr(C)]
 pub struct StgMutVar {
     pub header : StgHeader,
-    pub var : *mut StgClosure,
+    pub var : TaggedClosureRef,
 }
 
 // ------ stack frames -----------
@@ -220,7 +274,7 @@ pub struct StgMutVar {
 #[repr(C)]
 pub struct StgUpdateFrame {
     pub header : StgHeader,
-    pub updatee : *mut StgClosure,
+    pub updatee : TaggedClosureRef,
 }
 
 // Closure types: CATCH_FRAME
@@ -228,7 +282,7 @@ pub struct StgUpdateFrame {
 pub struct StgCatchFrame {
     pub header : StgHeader,
     pub exceptions_blocked : StgWord,
-    pub handler : *mut StgClosure,
+    pub handler : TaggedClosureRef,
 }
 
 #[repr(C)]
@@ -264,7 +318,7 @@ pub struct StgStopFrame {
 pub struct StgRetFun {
     pub info_table : StgInfoTableRef,
     pub size : StgWord,
-    pub fun : *mut StgClosure,
+    pub fun : TaggedClosureRef,
     pub payload : ClosurePayload,
 }
 
@@ -286,10 +340,10 @@ pub struct StgStableName {
 #[repr(C)]
 pub struct StgWeak {
     pub header : StgHeader,
-    pub cfinalizers : *mut StgClosure,
-    pub key : *mut StgClosure,
-    pub value : *mut StgClosure,
-    pub finalizer : *mut StgClosure,
+    pub cfinalizers : TaggedClosureRef,
+    pub key : TaggedClosureRef,
+    pub value : TaggedClosureRef,
+    pub finalizer : TaggedClosureRef,
     pub link : *mut StgWeak,
 }
 
@@ -306,7 +360,7 @@ union FinalizerFn {
 #[repr(C)]
 pub struct StgCFinalizerList {
     header: StgHeader,
-    link: *mut StgClosure,
+    link: TaggedClosureRef,
     finalize: FinalizerFn,
     ptr: *mut u8,
     eptr: *mut u8,
@@ -364,6 +418,7 @@ impl StgBCO {
 
 // which closure type?
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgMVarTSOQueue {
     pub header : StgHeader,
     pub link : *mut StgMVarTSOQueue,
@@ -372,11 +427,12 @@ pub struct StgMVarTSOQueue {
 
 // Closure types: MVAR_CLEAN, MVAR_DIRTY
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgMVar {
     pub header : StgHeader,
     pub head : *mut StgMVarTSOQueue,
     pub tail : *mut StgMVarTSOQueue,
-    pub value : *mut StgClosure,
+    pub value : TaggedClosureRef,
 }
 
 #[repr(C)]
@@ -390,7 +446,7 @@ pub struct StgTVarWatchQueue {
 #[repr(C)]
 pub struct StgTVar {
     pub header : StgHeader,
-    pub current_value : *mut StgClosure,
+    pub current_value : TaggedClosureRef,
     pub first_watch_queue_entry : *mut StgTVarWatchQueue,
     pub num_updates : StgInt,
 }
@@ -398,8 +454,8 @@ pub struct StgTVar {
 #[repr(C)]
 pub struct TRecEntry {
     pub tvar : *mut StgTVar,
-    pub expected_value : *mut StgClosure,
-    pub new_value : *mut StgClosure,
+    pub expected_value : TaggedClosureRef,
+    pub new_value : TaggedClosureRef,
     // TODO: add num_updates when THREADED_RTS
 }
 
@@ -435,23 +491,23 @@ pub struct StgTRecHeader {
 #[repr(C)]
 pub struct StgAtomicallyFrame {
     pub header : StgHeader,
-    pub code : *mut StgClosure,
-    pub result : *mut StgClosure,
+    pub code : TaggedClosureRef,
+    pub result : TaggedClosureRef,
 }
 
 #[repr(C)]
 pub struct StgCatchSTMFrame {
     pub header : StgHeader,
-    pub code : *mut StgClosure,
-    pub handler : *mut StgClosure,
+    pub code : TaggedClosureRef,
+    pub handler : TaggedClosureRef,
 }
 
 #[repr(C)]
 pub struct StgCatchRetryFrame {
     pub header : StgHeader,
     pub running_alt_code : StgWord,
-    pub first_code : *mut StgClosure,
-    pub alt_code : *mut StgClosure,
+    pub first_code : TaggedClosureRef,
+    pub alt_code : TaggedClosureRef,
 }
 
 
@@ -478,7 +534,7 @@ pub struct MessageThrowTo {
     pub link : *mut MessageThrowTo, // should be just Message ?
     pub source : *mut StgTSO,
     pub target : *mut StgTSO,
-    pub exception : *mut StgClosure,
+    pub exception : TaggedClosureRef,
 }
 
 #[repr(C)]
@@ -486,7 +542,7 @@ pub struct MessageBlackHole {
     pub header : StgHeader,
     pub link : *mut MessageBlackHole, // should be just Message ?
     pub tso : *mut StgTSO,
-    pub bh : *mut StgClosure,
+    pub bh : TaggedClosureRef,
 }
 
 #[repr(C)]
@@ -521,7 +577,7 @@ pub struct StgCompactNFData {
     pub nursery : *mut StgCompactNFDataBlock,
     pub last : *mut StgCompactNFDataBlock,
     pub hash : *mut Hashtable, // TODO: define HashTable
-    pub result : *mut StgClosure,
+    pub result : TaggedClosureRef,
     pub link : *mut StgCompactNFData, // maybe need to rework compact normal form
 }
 

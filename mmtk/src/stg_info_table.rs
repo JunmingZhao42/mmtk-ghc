@@ -1,6 +1,7 @@
 // use crate::DummyVM;
 use super::types::*;
 use super::stg_closures::*;
+use std::fmt;
 /**
  * GHC closure info tables in Rust
  * Original C code is at ghc/rts/include/rts/storage/InfoTables.h
@@ -141,11 +142,18 @@ pub union StgClosureInfo {
     pub selector_offset : StgWord,
 }
 
+impl fmt::Debug for StgClosureInfo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "StgClosureInfo")
+    }
+}
+
 /* ----------------------------------------------------------------------------
    Function info tables
    ------------------------------------------------------------------------- */
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgSRTField {
     pub srt : StgHalfInt,
     // TODO: handle non USE_INLINE_SRT_FIELD
@@ -153,9 +161,11 @@ pub struct StgSRTField {
 
 #[cfg(not(profiling))]
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgProfInfo {} // TODO: handle profiling case
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgInfoTable {
     // TODO: non TABLES_NEXT_TO_CODE
     #[cfg(not(tables_next_to_code))]
@@ -242,3 +252,10 @@ pub struct StgConInfoTable {
 }
 
 // TODO: implement other macros
+
+#[no_mangle]
+pub extern "C" fn print_obj(obj : TaggedClosureRef){
+    unsafe{
+        println!("{:?}", Closure::from_ptr(obj.to_ptr()));
+    }
+}

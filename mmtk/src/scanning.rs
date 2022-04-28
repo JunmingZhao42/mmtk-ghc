@@ -37,24 +37,24 @@ impl Scanning<DummyVM> for VMScanning {
         ev: &mut EV,
     ) {
         unsafe{
-            /*
             let closure: *const StgClosure = obj.to_address().to_ptr();
             let itbl: *const StgInfoTable = unsafe {(*closure).header.info_table.get_info_table()};
-            
-            
-            match (*itbl).type_ {
-                StgClosureType::MVAR_CLEAN | StgClosureType::MVAR_DIRTY => {
-                    let mvar: *const StgMVar = closure.cast();
-                    ev.visit_edge(Address::from_ptr((*mvar).head));
-                    ev.visit_edge(Address::from_ptr((*mvar).tail));
-                    ev.visit_edge(Address::from_ptr((*mvar).value));
-                },
-                StgClosureType::TVAR => {
+            match Closure::from_ptr(closure) {
+                Closure::MVar(mvar) => ev.visit_edge(Address::from_ptr(mvar.head))
 
-                },
+            }
+            
+            // match (*itbl).type_ {
+            //     StgClosureType::MVAR_CLEAN | StgClosureType::MVAR_DIRTY => {
+            //         let mvar: *const StgMVar = closure.cast();
+            //         ev.visit_edge(Address::from_ptr((*mvar).head));
+            //         ev.visit_edge(Address::from_ptr((*mvar).tail));
+            //         ev.visit_edge(Address::from_ptr((*mvar).value));
+            //     },
+            //     StgClosureType::TVAR => {
+
                 // et cetera
             }
-            */
             
         }
 
