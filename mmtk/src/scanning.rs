@@ -37,29 +37,32 @@ impl Scanning<DummyVM> for VMScanning {
         ev: &mut EV,
     ) {
         unsafe {
-            let closure: *const StgClosure = obj.to_address().to_ptr();
-            let itbl: *const StgInfoTable = unsafe {(*closure).header.info_table.get_info_table()};
-            match Closure::from_ptr(closure) {
+            let closure_ref = TaggedClosureRef::from_object_reference(obj);
+            let itbl: &'static StgInfoTable = closure_ref.get_info_table();
+            
+            match closure_ref.to_closure() {
                 Closure::MVar(mvar) => {
-                    ev.visit_edge(Address::from_ptr(mvar.head));
-                    ev.visit_edge(Address::from_ptr(mvar.tail));
+                    ev.visit_edge(mvar.head.to_address());
+                    ev.visit_edge(mvar.tail.to_address());
                     ev.visit_edge(Address::from_ptr(mvar.value.to_ptr()));
                 }
                 Closure::TVar(tvar) => {
                     ev.visit_edge(Address::from_ptr(tvar.current_value.to_ptr()));
                     ev.visit_edge(Address::from_ptr(tvar.first_watch_queue_entry));
                 }
+                // TODO: Implement FUN case
                 // TODO: Check these two implementations ... 
                 Closure::Thunk(thunk) => {
-                    let end : u32 = (&*itbl).layout.payload.ptrs;
-                    for n in 1..end {
+                    // TODO: Trace SRTs
+                    let n_ptrs : u32 = itbl.layout.payload.ptrs;
+                    for n in 0..n_ptrs {
                         let edge = thunk.payload.get(n as usize);
                         ev.visit_edge(Address::from_ptr(edge.to_ptr()));
                     }
                 }
                 Closure::Constr(closr) => {
-                    let end : u32 = (&*itbl).layout.payload.ptrs;
-                    for n in 1..end {
+                    let n_ptrs : u32 = itbl.layout.payload.ptrs;
+                    for n in 0..n_ptrs {
                         let edge = closr.payload.get(n as usize);
                         ev.visit_edge(Address::from_ptr(edge.to_ptr()));
                     }
@@ -91,13 +94,13 @@ impl Scanning<DummyVM> for VMScanning {
                     ev.visit_edge(Address::from_ptr(fun.fun.to_ptr()));
                     // TODO: scavenge_AP (just call scavenge_PAP_payload ?)
                 }
-                Closure::ArrBytes(_) => { return; }
+                Closure::ArrBytes(_) => (),
                 Closure::ArrMutPtr(_array) => {
                     // TODO: scavenge_mut_arr_ptrs
                 }
                 Closure::ArrMutPtrSmall(array) => {
-                    let end = array.ptrs;
-                    for n in 1..end {
+                    let n_ptrs = array.ptrs;
+                    for n in 0..n_ptrs {
                         let edge = array.payload.get(n);
                         ev.visit_edge(Address::from_ptr(edge.to_ptr()));
                     }
@@ -108,6 +111,8 @@ impl Scanning<DummyVM> for VMScanning {
                     ev.visit_edge(Address::from_ptr(tso.trec));
                     ev.visit_edge(Address::from_ptr(tso.stackobj));
                     ev.visit_edge(Address::from_ptr(tso.link));
+                    
+                    // TODO: For now also trace global_link, keep a TODO around to revisit
 
                     if tso.why_blocked == StgTSOBlocked::BLOCKED_ON_MVAR
                     || tso.why_blocked == StgTSOBlocked::BLOCKED_ON_MVAR_READ
@@ -128,8 +133,8 @@ impl Scanning<DummyVM> for VMScanning {
                 Closure::TRecChunk(trec_chunk) => {
                     ev.visit_edge(Address::from_ptr(trec_chunk.prev_chunk));
 
-                    let end = trec_chunk.next_entry_idx;
-                    for n in 1..end {
+                    let n_ptrs = trec_chunk.next_entry_idx;
+                    for n in 0..n_ptrs {
                         let trec_entry = &trec_chunk.entries[n];
                         ev.visit_edge(Address::from_ptr(trec_entry.tvar));
                         ev.visit_edge(Address::from_ptr(trec_entry.expected_value.to_ptr()));
