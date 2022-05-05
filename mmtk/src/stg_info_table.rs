@@ -86,12 +86,14 @@ impl StgSmallBitmap {
 // -------------------- large bitmap --------------------
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgLargeBitmap {
     pub size    : StgWord,
     pub bitmap  : LargeBitMapPayload // similar to closure payload in stg_closures.rs
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct LargeBitMapPayload {}
 
 impl LargeBitMapPayload {
@@ -125,8 +127,8 @@ impl StgLargeBitmapRef {
    ------------------------------------------------------------------------- */
 #[repr(C)]
 pub struct StgPointerFirst {
-    ptrs    : StgHalfWord,  /* number of pointers */
-    nptrs   : StgHalfWord,  /* number of non-pointers */
+    pub ptrs    : StgHalfWord,  /* number of pointers */
+    pub nptrs   : StgHalfWord,  /* number of non-pointers */
 }
 
 #[repr(C)]

@@ -125,7 +125,7 @@ pub enum StgFunType {
  * is to be run.
  */
 
-#[derive(Eq)] 
+#[derive(Eq, Debug)]
 pub struct StgTSONext (StgWord16);
 impl StgTSONext {
     pub const THREAD_RUN_GHC : StgTSONext = StgTSONext(1);       /* return to address on top of stack */
@@ -144,7 +144,7 @@ impl PartialEq for StgTSONext {
  * Constants for the why_blocked field of a TSO
  */
 
-#[derive(Eq)] 
+#[derive(Eq, Debug)] 
 pub struct StgTSOBlocked (StgWord16);
 impl StgTSOBlocked {
     pub const NOT_BLOCKED : StgTSOBlocked = StgTSOBlocked(0);
@@ -176,7 +176,7 @@ impl PartialEq for StgTSOBlocked {
  * Flags for the tso->flags field.
  */
 
-#[derive(Eq)] 
+#[derive(Eq, Debug)] 
 pub struct StgTSOFlag (StgWord32);
 
 impl StgTSOFlag {

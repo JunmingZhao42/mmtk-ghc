@@ -71,11 +71,43 @@ impl ClosurePayload {
 #[derive(Debug)]
 pub enum Closure {
     Constr(&'static StgClosure),
+    Weak(&'static StgWeak),
+
     Thunk(&'static StgThunk),
-    ArrBytes(&'static StgArrBytes),
+    ThunkSelector(&'static StgSelector),
+
     Fun(&'static StgClosure),
-    PartialFunApp(&'static StgPAP),
+    PartialAppliedFun(&'static StgPAP),
+    AppliedFun(&'static StgAP),
+    PausedEval(&'static StgAP_STACK),
+
+    Indirect(&'static StgInd),
+    IndirectStatic(&'static StgIndStatic),
+
+    BlockingQueue(&'static StgBlockingQueue),
+    ArrBytes(&'static StgArrBytes),
+    ArrMutPtr(&'static StgMutArrPtrs),
+    ArrMutPtrSmall(&'static StgSmallMutArrPtrs),
+    MutVar(&'static StgMutVar),
+
+    Stack(&'static StgStack),
+    UpdateFrame(&'static StgUpdateFrame),
+    CatchFrame(&'static StgCatchFrame),
+    UnderflowFrame(&'static StgUnderflowFrame),
+    StopFrame(&'static StgStopFrame),
+    StackRetFun(&'static StgRetFun),
+
+    ByteCodeObj(&'static StgBCO),
+    TSOQueueMVar(&'static StgMVarTSOQueue),
+
+    TSO(&'static StgTSO),
+
     MVar(&'static StgMVar),
+    TVar(&'static StgTVar),
+
+    TRecChunk(&'static StgTRecChunk),
+    
+
 }
 
 impl Closure{
@@ -84,10 +116,59 @@ impl Closure{
             let info: &'static StgInfoTable = &*(*p).header.info_table.get_info_table();
             use StgClosureType::*;
             match info.type_ {
-                CONSTR | CONSTR_1_0 | CONSTR_0_1 | CONSTR_2_0 | CONSTR_1_1 | CONSTR_0_2
-                => Closure::Constr(&*(p as *const StgClosure)),
-                THUNK => Closure::Thunk(&*(p as *const StgThunk)),
-                ARR_WORDS => Closure::ArrBytes(&*(p as *const StgArrBytes)),
+                // MUT_PRIM ?
+                CONSTR | CONSTR_1_0 | CONSTR_0_1 | CONSTR_2_0 | CONSTR_1_1 | CONSTR_0_2 | MUT_PRIM=> 
+                    Closure::Constr(&*(p as *const StgClosure)),
+                THUNK | THUNK_1_0 | THUNK_0_1 | THUNK_2_0 | THUNK_1_1 | THUNK_0_2 => 
+                    Closure::Thunk(&*(p as *const StgThunk)),
+                THUNK_SELECTOR => 
+                    Closure::ThunkSelector(&*(p as *const StgSelector)),
+                PAP => 
+                    Closure::PartialAppliedFun(&*(p as *const StgPAP)),
+                AP => 
+                    Closure::AppliedFun(&*(p as *const StgAP)),
+                AP_STACK => 
+                    Closure::PausedEval(&*(p as *const StgAP_STACK)),
+                IND | BLACKHOLE => 
+                    Closure::Indirect(&*(p as *const StgInd)),
+                IND_STATIC => 
+                    Closure::IndirectStatic(&*(p as *const StgIndStatic)),
+                BLOCKING_QUEUE => 
+                    Closure::BlockingQueue(&*(p as *const StgBlockingQueue)),
+                ARR_WORDS => 
+                    Closure::ArrBytes(&*(p as *const StgArrBytes)),
+                MUT_ARR_PTRS_FROZEN_DIRTY | MUT_ARR_PTRS_FROZEN_CLEAN | MUT_VAR_CLEAN | MUT_VAR_DIRTY=> 
+                    Closure::ArrMutPtr(&*(p as *const StgMutArrPtrs)),
+                SMALL_MUT_ARR_PTRS_CLEAN | SMALL_MUT_ARR_PTRS_DIRTY | SMALL_MUT_ARR_PTRS_FROZEN_DIRTY |
+                SMALL_MUT_ARR_PTRS_FROZEN_CLEAN =>
+                    Closure::ArrMutPtrSmall(&*(p as *const StgSmallMutArrPtrs)),
+                // TODO
+                MUT_VAR_CLEAN | MUT_VAR_DIRTY =>
+                    Closure::ArrMutPtrSmall(&*(p as *const StgSmallMutArrPtrs)),
+                STACK =>
+                    Closure::Stack(&*(p as *const StgStack)),
+                UPDATE_FRAME =>
+                    Closure::UpdateFrame(&*(p as *const StgUpdateFrame)),
+                CATCH_FRAME =>
+                    Closure::CatchFrame(&*(p as *const StgCatchFrame)),
+                UNDERFLOW_FRAME =>
+                    Closure::UnderflowFrame(&*(p as *const StgUnderflowFrame)),
+                STOP_FRAME =>
+                    Closure::StopFrame(&*(p as *const StgStopFrame)),
+                RET_FUN =>
+                    Closure::StackRetFun(&*(p as *const StgRetFun)),
+                WEAK =>
+                    Closure::Weak(&*(p as *const StgWeak)),
+                BCO =>
+                    Closure::ByteCodeObj(&*(p as *const StgBCO)),
+                MVAR_CLEAN | MVAR_DIRTY =>
+                    Closure::MVar(&*(p as *const StgMVar)),
+                TVAR =>
+                    Closure::TVar(&*(p as *const StgTVar)),
+                TSO =>
+                    Closure::TSO(&*(p as *const StgTSO)),
+                TREC_CHUNK =>
+                    Closure::TRecChunk(&*(p as *const StgTRecChunk)),
 
                 _ => panic!("info={:?} address={:?}", info, info as *const StgInfoTable)
             }
@@ -128,6 +209,7 @@ pub struct StgThunk {
 
 // Closure types: THUNK_SELECTOR
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgSelector {
     pub header : StgThunkHeader,
     pub selectee : TaggedClosureRef,
@@ -146,6 +228,7 @@ pub struct StgPAP {
 
 // Closure types: AP
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgAP {
     pub header : StgThunkHeader,
     pub arity : StgHalfWord,
@@ -156,6 +239,7 @@ pub struct StgAP {
 
 // Closure types: AP_STACK
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgAP_STACK {
     pub header : StgThunkHeader,
     pub size : StgWord,
@@ -165,6 +249,7 @@ pub struct StgAP_STACK {
 
 // Closure types: IND
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgInd {
     pub header : StgHeader,
     pub indirectee : TaggedClosureRef,
@@ -172,6 +257,7 @@ pub struct StgInd {
 
 // Closure types: IND_STATIC
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgIndStatic {
     pub header : StgHeader,
     pub indirectee : TaggedClosureRef,
@@ -181,6 +267,7 @@ pub struct StgIndStatic {
 
 // Closure types: BLOCKING_QUEUE
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgBlockingQueue {
     pub header : StgHeader,
     pub link : *mut StgBlockingQueue,
@@ -190,7 +277,7 @@ pub struct StgBlockingQueue {
 }
 
 #[repr(C)]
-
+#[derive(Debug)]
 pub struct StgTSO {
     pub header : StgHeader,
     pub link : *mut StgTSO,
@@ -217,6 +304,7 @@ pub struct StgTSO {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgThreadID(StgWord64);
 
 // TODO: here are some dummy structs to complete fields in TSO
@@ -224,6 +312,7 @@ pub struct StgThreadID(StgWord64);
 pub struct InCall {}
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgTSOBlockInfo{}
 
 #[repr(C)]
@@ -244,6 +333,7 @@ pub struct StgArrBytes {
 // MUT_ARR_PTRS_FROZEN_DIRTY, MUT_ARR_PTRS_FROZEN_CLEAN, MUT_VAR_CLEAN,
 // MUT_VAR_DIRTY
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgMutArrPtrs {
     pub header : StgHeader,
     pub ptrs : StgWord,
@@ -254,6 +344,7 @@ pub struct StgMutArrPtrs {
 // Closure types: SMALL_MUT_ARR_PTRS_CLEAN, SMALL_MUT_ARR_PTRS_DIRTY,
 // SMALL_MUT_ARR_PTRS_FROZEN_DIRTY, SMALL_MUT_ARR_PTRS_FROZEN_CLEAN,
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgSmallMutArrPtrs {
     pub header : StgHeader,
     pub ptrs : StgWord,
@@ -262,6 +353,7 @@ pub struct StgSmallMutArrPtrs {
 
 // Closure types: MUT_VAR_CLEAN, MUT_VAR_DIRTY
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgMutVar {
     pub header : StgHeader,
     pub var : TaggedClosureRef,
@@ -272,6 +364,7 @@ pub struct StgMutVar {
 
 // Closure types: UPDATE_FRAME
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgUpdateFrame {
     pub header : StgHeader,
     pub updatee : TaggedClosureRef,
@@ -279,6 +372,7 @@ pub struct StgUpdateFrame {
 
 // Closure types: CATCH_FRAME
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgCatchFrame {
     pub header : StgHeader,
     pub exceptions_blocked : StgWord,
@@ -286,9 +380,11 @@ pub struct StgCatchFrame {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgStackPayload {}
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgStack {
     pub header : StgHeader,
     pub stack_size : StgWord32,
@@ -302,6 +398,7 @@ pub struct StgStack {
 
 // Closure types: UNDERFLOW_FRAME
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgUnderflowFrame {
     pub info_table : StgInfoTableRef,
     pub next_chunk : *mut StgStack,
@@ -309,12 +406,14 @@ pub struct StgUnderflowFrame {
 
 // Closure types: STOP_FRAME
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgStopFrame {
     pub header : StgHeader,
 }
 
 // Closure types: RET_FUN
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgRetFun {
     pub info_table : StgInfoTableRef,
     pub size : StgWord,
@@ -338,6 +437,7 @@ pub struct StgStableName {
 
 // Closure types: WEAK
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgWeak {
     pub header : StgHeader,
     pub cfinalizers : TaggedClosureRef,
@@ -380,6 +480,7 @@ impl StgCFinalizerList {
 
 // Closure types: BCO
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgBCO {
     pub header : StgHeader,
     pub instrs : *mut StgArrBytes,
@@ -444,6 +545,7 @@ pub struct StgTVarWatchQueue {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgTVar {
     pub header : StgHeader,
     pub current_value : TaggedClosureRef,
@@ -452,6 +554,7 @@ pub struct StgTVar {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct TRecEntry {
     pub tvar : *mut StgTVar,
     pub expected_value : TaggedClosureRef,
@@ -464,6 +567,7 @@ const TREC_CHUNK_NUM_ENTRIES: usize = 16;
 
 // contains many TRec entries and link them together
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgTRecChunk {
     pub header : StgHeader,
     pub prev_chunk : *mut StgTRecChunk,
