@@ -2,6 +2,8 @@
 use super::types::*;
 use super::stg_closures::*;
 use std::fmt;
+use std::ops::Deref;
+
 /**
  * GHC closure info tables in Rust
  * Original C code is at ghc/rts/include/rts/storage/InfoTables.h
@@ -59,7 +61,8 @@ pub union Bitmap {
 
 // -------------------- small bitmap --------------------
 #[repr(C)]
-pub struct StgSmallBitmap (StgWord);
+#[derive(Debug, Copy, Clone)]
+pub struct StgSmallBitmap (pub StgWord);
 
 impl StgSmallBitmap {
     // TODO: handle 32 bits constants
@@ -88,7 +91,7 @@ impl StgSmallBitmap {
 #[repr(C)]
 #[derive(Debug)]
 pub struct StgLargeBitmap {
-    pub size    : StgWord,
+    pub size    : StgWord, // number of bits
     pub bitmap  : LargeBitMapPayload // similar to closure payload in stg_closures.rs
 }
 
@@ -97,10 +100,10 @@ pub struct StgLargeBitmap {
 pub struct LargeBitMapPayload {}
 
 impl LargeBitMapPayload {
-    pub fn get_w(&self, i: usize) -> *mut StgClosure {
+    pub fn get_w(&self, i: usize) -> *const StgWord {
         unsafe {
             let ptr: *const LargeBitMapPayload = &*self;
-            let payload: *const *mut StgClosure = ptr.cast();
+            let payload: *const *mut StgWord = ptr.cast();
             *payload.offset(i as isize)
         }
     }
@@ -114,6 +117,7 @@ pub struct StgLargeBitmapRef {
 }
 
 impl StgLargeBitmapRef {
+    // relative to the beginning of the infotable of the closure
     pub fn deref(&self, itbl: &StgInfoTable) -> *const StgLargeBitmap {
         unsafe {
             offset_from_end(itbl, self.offset as isize)
@@ -139,7 +143,7 @@ pub union StgClosureInfo {
     
     // TODO: check if x64 is still related to OFFSET_FIELD
     // Check if hack in Note [x86-64-relative] is still necessary 
-    pub large_bitmap : StgLargeBitmapRef,
+    pub large_bitmap_ref : StgLargeBitmapRef,
 
     pub selector_offset : StgWord,
 }
@@ -165,6 +169,45 @@ pub struct StgSRTField {
 #[repr(C)]
 #[derive(Debug)]
 pub struct StgProfInfo {} // TODO: handle profiling case
+
+/// Tables-next-to-code reference.
+///
+/// <structure, e.g. an info table> 
+/// can be used for both StgInfoTable and StgRetInfoTable
+/// 
+/// This is a reference to a structure which, when tables-next-to-code is enabled,
+/// lives directly before code.
+#[repr(C)]
+#[derive(Debug)]
+pub struct TntcRef<T> (*const T);
+
+impl<T> TntcRef<T> {
+    pub fn get_ptr(&self) -> *const T {
+        // some info table not always valid
+        // load and unload codes make info table invalid
+        unsafe {
+            if true || cfg!(tables_next_to_code) {
+                self.0.offset(-1)
+            } else {
+                self.0
+            }
+        }
+    }
+}
+
+impl<T> Deref for TntcRef<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        unsafe {
+            &*self.get_ptr()
+        }
+    }
+}
+
+pub type StgInfoTableRef = TntcRef<StgInfoTable>;
+pub type StgRetInfoTableRef = TntcRef<StgRetInfoTable>;
+pub type StgFunInfoTableRef = TntcRef<StgFunInfoTable>;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -199,10 +242,28 @@ pub struct StgFunInfoTable {
     // TODO: handle non TABLES_NEXT_TO_CODE (need to use StgFunInfoExtraFwd)
 }
 
+impl StgFunInfoTable {
+    // rts/include/rts/storage/ClosureMacros.h
+    pub fn from_info_table(itbl : &'static StgInfoTable) -> &'static StgFunInfoTable {
+        unsafe {
+            let itbl = itbl as *const StgInfoTable;
+            &*(itbl.offset(1) as *const StgFunInfoTable).offset(-1)
+        }
+    }
+
+    pub fn to_info_table(itbl : &'static StgFunInfoTable) ->  &'static StgInfoTable {
+        unsafe {
+            let itbl = itbl as *const StgFunInfoTable;
+            &*(itbl.offset(1) as *const StgInfoTable).offset(-1)
+        }
+    }
+}
+
 /* -----------------------------------------------------------------------------
    Return info tables
    -------------------------------------------------------------------------- */
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgRetInfoTable {
     // (check line 160 InfoTables.h)
     // TODO: USE_SRT_POINTER is true
@@ -211,9 +272,14 @@ pub struct StgRetInfoTable {
 }
 
 impl StgRetInfoTable {
-    pub fn get_srt(&self) -> *const StgClosure {
+    pub fn get_srt(&self) -> Option<*const StgClosure> {
         unsafe {
-            offset_from_end(self, self.i.srt.srt as isize)
+            if self.i.srt.srt != 0 {
+                Some(offset_from_end(self, self.i.srt.srt as isize))
+            }
+            else {
+                None
+            }
         }
     }
 }

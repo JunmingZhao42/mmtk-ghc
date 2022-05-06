@@ -1,4 +1,8 @@
 // use crate::DummyVM;
+use super::stg_closures::*;
+use super::stg_info_table::*;
+
+
 pub type StgWord = usize;
 pub type StgPtr = *mut StgWord;
 
@@ -14,7 +18,7 @@ pub type StgHalfInt = i32;
 
 // ------------ ClosureTypes.h ------------
 #[repr(u32)]
-#[derive(PartialEq, Eq, Debug)] // comparison traits
+#[derive(PartialEq, Eq, Debug, Copy, Clone)] // comparison traits
 #[allow(non_camel_case_types)]
 pub enum StgClosureType {
     INVALID_OBJECT                    =  0,
@@ -46,6 +50,7 @@ pub enum StgClosureType {
     AP_STACK                          = 26,
     IND                               = 27,
     IND_STATIC                        = 28,
+    // stack frames
     RET_BCO                           = 29,
     RET_SMALL                         = 30,
     RET_BIG                           = 31,
@@ -54,6 +59,7 @@ pub enum StgClosureType {
     CATCH_FRAME                       = 34,
     UNDERFLOW_FRAME                   = 35,
     STOP_FRAME                        = 36,
+    // end of stack frames
     BLOCKING_QUEUE                    = 37,
     BLACKHOLE                         = 38,
     MVAR_CLEAN                        = 39,
@@ -85,12 +91,18 @@ pub enum StgClosureType {
 }
 
 // ------------ FunTypes.h ------------
+extern "C" {
+    static stg_arg_bitmaps : [usize; 0];
+}
 
 // pub struct StgFunType (StgHalfWord);
 #[repr(u32)]
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Copy, Clone)]
 #[allow(non_camel_case_types)]
 pub enum StgFunType {
+    ARG_GEN     =  0,
+    ARG_GEN_BIG =  1,
+    ARG_BCO     =  2,
     ARG_NONE    =  3,
     ARG_N       =  4,
     ARG_P       =  5,
@@ -117,6 +129,15 @@ pub enum StgFunType {
     ARG_PPPPPP   = 26,
     ARG_PPPPPPP  = 27,
     ARG_PPPPPPPP = 28,
+}
+
+impl StgFunType {
+    pub fn get_small_bitmap(&self) -> StgSmallBitmap {
+        unsafe {
+            // index: take the value from the ref
+            StgSmallBitmap(stg_arg_bitmaps[*self as usize])
+        }
+    }
 }
 // ------------ TSO related constants from: rts/include/rts/Constants.h ------------
 

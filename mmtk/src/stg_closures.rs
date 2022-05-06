@@ -1,8 +1,23 @@
 // use crate::DummyVM;
 use super::types::*;
 use super::stg_info_table::*;
-// ------------ Closures.h ------------
+use mmtk::util::{Address, ObjectReference};
+use std::mem::size_of;
 
+
+fn offset_bytes<T>(ptr: *const T, n: isize) -> *const T {
+    unsafe {
+        ptr.cast::<u8>().offset(n).cast()
+    }
+}    
+
+fn offset_words<T>(ptr: *const T, n: isize) -> *const T {
+    unsafe {
+        ptr.cast::<StgWord>().offset(n).cast()
+    }
+}
+
+// ------------ Closures.h ------------
 
 // TODO: handle when profiling case
 #[repr(C)]
@@ -14,26 +29,6 @@ pub struct StgProfHeader {}
 #[derive(Debug)]
 pub struct StgSMPThunkHeader {
     pub pad : StgWord
-}
-
-// TODO: make correspoinding comments
-// safe way to dereference
-#[repr(C)]
-#[derive(Debug)]
-pub struct StgInfoTableRef (*const StgInfoTable);
-
-impl StgInfoTableRef {
-    pub fn get_info_table(&self) -> *const StgInfoTable {
-        // some info table not always valid
-        // load and unload codes make info table invalid
-        unsafe {
-            if true || cfg!(tables_next_to_code) {
-                self.0.offset(-1)
-            } else {
-                self.0
-            }
-        }
-    }
 }
 
 #[repr(C)]
@@ -79,7 +74,7 @@ pub enum Closure {
     Fun(&'static StgClosure),
     PartialAppliedFun(&'static StgPAP),
     AppliedFun(&'static StgAP),
-    PausedEval(&'static StgAP_STACK),
+    ApStack(&'static StgAP_STACK),
 
     Indirect(&'static StgInd),
     IndirectStatic(&'static StgIndStatic),
@@ -91,11 +86,6 @@ pub enum Closure {
     MutVar(&'static StgMutVar),
 
     Stack(&'static StgStack),
-    UpdateFrame(&'static StgUpdateFrame),
-    CatchFrame(&'static StgCatchFrame),
-    UnderflowFrame(&'static StgUnderflowFrame),
-    StopFrame(&'static StgStopFrame),
-    StackRetFun(&'static StgRetFun),
 
     ByteCodeObj(&'static StgBCO),
     TSOQueueMVar(&'static StgMVarTSOQueue),
@@ -113,11 +103,11 @@ pub enum Closure {
 impl Closure{
     pub fn from_ptr(p: *const StgClosure) -> Closure {
         unsafe {
-            let info: &'static StgInfoTable = &*(*p).header.info_table.get_info_table();
+            let info: &'static StgInfoTable = &*(*p).header.info_table;
             use StgClosureType::*;
             match info.type_ {
                 // MUT_PRIM ?
-                CONSTR | CONSTR_1_0 | CONSTR_0_1 | CONSTR_2_0 | CONSTR_1_1 | CONSTR_0_2 | MUT_PRIM=> 
+                CONSTR | CONSTR_1_0 | CONSTR_0_1 | CONSTR_2_0 | CONSTR_1_1 | CONSTR_0_2 | MUT_PRIM => 
                     Closure::Constr(&*(p as *const StgClosure)),
                 THUNK | THUNK_1_0 | THUNK_0_1 | THUNK_2_0 | THUNK_1_1 | THUNK_0_2 => 
                     Closure::Thunk(&*(p as *const StgThunk)),
@@ -128,7 +118,7 @@ impl Closure{
                 AP => 
                     Closure::AppliedFun(&*(p as *const StgAP)),
                 AP_STACK => 
-                    Closure::PausedEval(&*(p as *const StgAP_STACK)),
+                    Closure::ApStack(&*(p as *const StgAP_STACK)),
                 IND | BLACKHOLE => 
                     Closure::Indirect(&*(p as *const StgInd)),
                 IND_STATIC => 
@@ -137,26 +127,15 @@ impl Closure{
                     Closure::BlockingQueue(&*(p as *const StgBlockingQueue)),
                 ARR_WORDS => 
                     Closure::ArrBytes(&*(p as *const StgArrBytes)),
-                MUT_ARR_PTRS_FROZEN_DIRTY | MUT_ARR_PTRS_FROZEN_CLEAN | MUT_VAR_CLEAN | MUT_VAR_DIRTY=> 
+                MUT_ARR_PTRS_FROZEN_DIRTY | MUT_ARR_PTRS_FROZEN_CLEAN => 
                     Closure::ArrMutPtr(&*(p as *const StgMutArrPtrs)),
                 SMALL_MUT_ARR_PTRS_CLEAN | SMALL_MUT_ARR_PTRS_DIRTY | SMALL_MUT_ARR_PTRS_FROZEN_DIRTY |
                 SMALL_MUT_ARR_PTRS_FROZEN_CLEAN =>
                     Closure::ArrMutPtrSmall(&*(p as *const StgSmallMutArrPtrs)),
-                // TODO
                 MUT_VAR_CLEAN | MUT_VAR_DIRTY =>
-                    Closure::ArrMutPtrSmall(&*(p as *const StgSmallMutArrPtrs)),
+                    Closure::MutVar(&*(p as *const StgMutVar)),
                 STACK =>
                     Closure::Stack(&*(p as *const StgStack)),
-                UPDATE_FRAME =>
-                    Closure::UpdateFrame(&*(p as *const StgUpdateFrame)),
-                CATCH_FRAME =>
-                    Closure::CatchFrame(&*(p as *const StgCatchFrame)),
-                UNDERFLOW_FRAME =>
-                    Closure::UnderflowFrame(&*(p as *const StgUnderflowFrame)),
-                STOP_FRAME =>
-                    Closure::StopFrame(&*(p as *const StgStopFrame)),
-                RET_FUN =>
-                    Closure::StackRetFun(&*(p as *const StgRetFun)),
                 WEAK =>
                     Closure::Weak(&*(p as *const StgWeak)),
                 BCO =>
@@ -174,6 +153,10 @@ impl Closure{
             }
         }
     }
+
+    pub fn to_address(&self) -> Address {
+        Address::from_ptr(self)
+    }
 }
 
 
@@ -189,13 +172,31 @@ pub struct StgClosure {
 pub struct TaggedClosureRef (*mut StgClosure);
 
 impl TaggedClosureRef {
+    // untagging from a tagged pointer
     pub fn to_ptr(&self) -> *const StgClosure {
         const TAG_BITS: usize = 0x7;
-        // (mmtk::util::Address::from_ptr(self.0) & !TAG_BITS).to_ptr()
-        
-        // ... or alternatively ...
+
         let masked: usize = (self.0 as usize) & !TAG_BITS;
         masked as *const StgClosure
+    }
+
+    pub fn from_object_reference(obj : ObjectReference) -> TaggedClosureRef {
+        let closure: *const StgClosure = obj.to_address().to_ptr();
+        TaggedClosureRef(closure as *mut StgClosure)
+    }
+
+    pub fn get_info_table(&self) -> &'static StgInfoTable {
+        unsafe{
+            &*(*self.0).header.info_table
+        }
+    }
+    
+    pub fn to_closure(&self) -> Closure {
+        Closure::from_ptr(self.to_ptr())
+    }
+
+    pub fn to_address(&self) -> Address {
+        Address::from_ptr(self.to_ptr())
     }
 }
 
@@ -242,9 +243,19 @@ pub struct StgAP {
 #[derive(Debug)]
 pub struct StgAP_STACK {
     pub header : StgThunkHeader,
-    pub size : StgWord,
+    pub size : StgWord, // number of words
     pub fun : TaggedClosureRef,
     pub payload : ClosurePayload,
+}
+
+impl StgAP_STACK {
+    pub fn iter(&self) -> StackIterator {
+        let start : *const StgStackFrame = (&self.payload as *const ClosurePayload).cast();
+        StackIterator{
+            current : start,
+            end : offset_words(start, self.size as isize),
+        }
+    }
 }
 
 // Closure types: IND
@@ -292,7 +303,7 @@ pub struct StgTSO {
     pub id : StgThreadID, 
     pub saved_errno : StgWord32,
     pub dirty : StgWord32,
-    pub bound : *mut  InCall,
+    pub bound : *mut InCall,
     pub cap : *mut Capability,
     pub trec : *mut StgTRecHeader,
     pub blocked_exceptions : *mut MessageThrowTo,
@@ -307,13 +318,36 @@ pub struct StgTSO {
 #[derive(Debug)]
 pub struct StgThreadID(StgWord64);
 
+#[repr(C)]
+pub struct Task {}
+
 // TODO: here are some dummy structs to complete fields in TSO
 #[repr(C)]
-pub struct InCall {}
+#[derive(Debug)]
+pub struct InCall {
+    pub tso : *mut StgTSO,
+    pub suspended_tso : *mut StgTSO,
+    pub suspended_cap : *mut Capability,
+    pub rstat : StgInt, // TODO
+    pub ret : *mut TaggedClosureRef,
+    pub task : *mut Task,
+    pub prev_stack : *mut InCall,
+    pub prev : *mut InCall,
+    pub next : *mut InCall,
+}
 
 #[repr(C)]
 #[derive(Debug)]
-pub struct StgTSOBlockInfo{}
+pub struct StgTSOBlockInfo {
+    pub closure : TaggedClosureRef,
+    pub prev : *mut StgTSO,
+    pub black_hole : *mut MessageBlackHole,
+    pub throw_to : *mut MessageThrowTo,
+    pub wake_up : *mut MessageWakeup,
+    pub fd : StgInt,
+    pub target : StgWord,
+    // TODO: THREADED_RTS
+}
 
 #[repr(C)]
 pub struct Capability {}
@@ -359,14 +393,154 @@ pub struct StgMutVar {
     pub var : TaggedClosureRef,
 }
 
-// ------ stack frames -----------
+#[repr(C)]
+#[derive(Debug)]
+pub struct StgStack {
+    pub header : StgHeader,
+    pub stack_size : StgWord32, // number of words
+    pub dirty : StgWord8,
+    pub marking : StgWord8,
+    pub sp : *const StgStackFrame,
+    pub payload : StgStackPayload, // stack contents - stack frames
+}
 
+impl StgStack {
+    pub fn iter(&self) -> StackIterator {
+        unsafe {
+            let start : *const StgWord = (&self.payload as *const StgStackPayload).cast();
+            StackIterator{
+                current : self.sp,
+                end : start.offset(self.stack_size as isize) as *const StgStackFrame,
+            }
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Debug)]
+pub struct StgStackPayload {}
+
+pub struct StackIterator {
+    current : *const StgStackFrame, // fst word of the sf
+    end : *const StgStackFrame,
+}
+
+impl Iterator for StackIterator {
+    type Item = StackFrame;
+    fn next(&mut self) -> Option<StackFrame> {
+        // 1. dref -> info_table -
+        if self.current < self.end {
+            // info table of the stackframe
+            let itbl: &'static StgRetInfoTable = unsafe { &(*self.current).header.info_table}; 
+            let current = self.current;
+            use StgClosureType::*;        
+
+            match itbl.i.type_ {
+                UPDATE_FRAME => unsafe {
+                    self.current = self.current.offset(size_of::<StgUpdateFrame>() as isize);
+                    Some(StackFrame::UPD_FRAME(&*current.cast()))
+                }
+                CATCH_STM_FRAME | CATCH_RETRY_FRAME | ATOMICALLY_FRAME | UNDERFLOW_FRAME |
+                STOP_FRAME | CATCH_FRAME | RET_SMALL => unsafe {
+                    let bitmap = itbl.i.layout.small_bitmap;
+                    let mut size = bitmap.size() * size_of::<StgWord>(); // words
+                    size += size_of::<StgStackFrame>(); // bytes
+                    self.current = offset_bytes(self.current, size as isize);
+                    Some(StackFrame::RET_SMALL(&*current.cast(), bitmap))
+                }
+                RET_BIG => unsafe {
+                    let bitmap =  &*(itbl.i.layout.large_bitmap_ref.deref(&itbl.i));
+                    let size = bitmap.size * size_of::<StgWord>() + size_of::<StgStackFrame>();
+                    self.current = offset_bytes(self.current, size as isize);
+                    Some(StackFrame::RET_BIG(&*current.cast(), bitmap))
+                }
+                RET_FUN => unsafe {
+                    let ret_fun : &'static StgRetFunFrame = &*current.cast();
+                    let fun_info : &'static StgFunInfoTable = 
+                        StgFunInfoTable::from_info_table(ret_fun.fun.get_info_table());
+                    use StgFunType::*;
+                    match fun_info.f.fun_type {
+                        ARG_GEN => {
+                            // small bitmap
+                            let small_bitmap : StgSmallBitmap = fun_info.f.bitmap.small_bitmap;
+                            let mut size = small_bitmap.size() * size_of::<StgWord>();
+                            size += size_of::<StgRetFunFrame>();
+                            self.current = offset_bytes(self.current, size as isize);
+                            Some(StackFrame::RET_FUN_SMALL(&*current.cast(), small_bitmap))
+                        }
+                        ARG_GEN_BIG => {
+                            // large bitmap
+                            let bitmap =  &*(fun_info.f.bitmap.large_bitmap_ref.deref(&itbl.i));
+                            let mut size = bitmap.size * size_of::<StgWord>() + size_of::<StgStackFrame>();
+                            size += size_of::<StgRetFunFrame>();
+                            self.current = offset_bytes(self.current, size as isize);
+                            Some(StackFrame::RET_FUN_LARGE(&*current.cast(), bitmap))
+                        }
+                        _ => {
+                            // small bitmap indexed by the function type
+                            let small_bitmap = StgFunType::get_small_bitmap(&fun_info.f.fun_type);
+                            let mut size = small_bitmap.size() * size_of::<StgWord>();
+                            size += size_of::<StgRetFunFrame>();
+                            self.current = offset_bytes(self.current, size as isize);
+                            Some(StackFrame::RET_FUN_SMALL(&*current.cast(), small_bitmap))
+                        }
+                    }
+                }
+                // TODO: add RET_BCO case
+                _ => panic!("Unexpected stackframe type {:?} ", itbl.i.type_)
+
+            }
+        }
+        else {
+            return None;
+        }
+    }
+}
+
+
+
+// ------ stack frames -----------
+#[repr(C)]
+#[derive(Debug)]
+pub struct StgStackFrameHeader {
+    pub info_table : StgRetInfoTableRef,
+    pub prof_header : StgProfHeader,
+}
+
+pub struct StgStackFrame {
+    pub header : StgStackFrameHeader,
+    pub payload : ClosurePayload,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug)]
+pub enum StackFrame {
+    RET_BCO(&'static StgRetFrame),
+    RET_SMALL(&'static StgRetFrame, StgSmallBitmap),
+    RET_BIG(&'static StgRetFrame, &'static StgLargeBitmap),
+    RET_FUN_SMALL(&'static StgRetFunFrame, StgSmallBitmap),
+    RET_FUN_LARGE(&'static StgRetFunFrame,  &'static StgLargeBitmap),
+    UPD_FRAME(&'static StgUpdateFrame),
+    // CATCH_FRAME(&'static StgCatchFrame),
+    // UNDERFLOW_FRAME(&'static StgUnderflowFrame),
+    // STOP_FRAME(&'static StgStopFrame),
+    // ATOMICALLY_FRAME(&'static StgAtomicallyFrame),
+    // CATCH_RETRY_FRAME(&'static StgCatchRetryFrame),
+    // CATCH_STM_FRAME(&'static StgCatchSTMFrame),
+}
+
+#[repr(C)]
+#[derive(Debug)]
+pub struct StgRetFrame {
+    pub header : StgStackFrameHeader,
+    pub payload : ClosurePayload,
+}
 
 // Closure types: UPDATE_FRAME
 #[repr(C)]
 #[derive(Debug)]
 pub struct StgUpdateFrame {
-    pub header : StgHeader,
+    pub header : StgStackFrameHeader,
     pub updatee : TaggedClosureRef,
 }
 
@@ -374,24 +548,9 @@ pub struct StgUpdateFrame {
 #[repr(C)]
 #[derive(Debug)]
 pub struct StgCatchFrame {
-    pub header : StgHeader,
+    pub header : StgStackFrameHeader,
     pub exceptions_blocked : StgWord,
     pub handler : TaggedClosureRef,
-}
-
-#[repr(C)]
-#[derive(Debug)]
-pub struct StgStackPayload {}
-
-#[repr(C)]
-#[derive(Debug)]
-pub struct StgStack {
-    pub header : StgHeader,
-    pub stack_size : StgWord32,
-    pub dirty : StgWord8,
-    pub marking : StgWord8,
-    pub sp : *mut StgWord,
-    pub stack : StgStackPayload,
 }
 
 // impl walk through stack?
@@ -400,7 +559,7 @@ pub struct StgStack {
 #[repr(C)]
 #[derive(Debug)]
 pub struct StgUnderflowFrame {
-    pub info_table : StgInfoTableRef,
+    pub info_table : StgRetInfoTableRef,
     pub next_chunk : *mut StgStack,
 }
 
@@ -408,18 +567,44 @@ pub struct StgUnderflowFrame {
 #[repr(C)]
 #[derive(Debug)]
 pub struct StgStopFrame {
-    pub header : StgHeader,
+    pub header : StgStackFrameHeader,
 }
 
+#[repr(C)]
+#[derive(Debug)]
+pub struct StgAtomicallyFrame {
+    pub header : StgStackFrameHeader,
+    pub code : TaggedClosureRef,
+    pub result : TaggedClosureRef,
+}
+
+#[repr(C)]
+#[derive(Debug)]
+pub struct StgCatchSTMFrame {
+    pub header : StgStackFrameHeader,
+    pub code : TaggedClosureRef,
+    pub handler : TaggedClosureRef,
+}
+
+#[repr(C)]
+#[derive(Debug)]
+pub struct StgCatchRetryFrame {
+    pub header : StgStackFrameHeader,
+    pub running_alt_code : StgWord,
+    pub first_code : TaggedClosureRef,
+    pub alt_code : TaggedClosureRef,
+}
 // Closure types: RET_FUN
 #[repr(C)]
 #[derive(Debug)]
-pub struct StgRetFun {
-    pub info_table : StgInfoTableRef,
+pub struct StgRetFunFrame{
+    pub info_table : StgRetInfoTableRef,
     pub size : StgWord,
     pub fun : TaggedClosureRef,
     pub payload : ClosurePayload,
 }
+
+/// end of stack frame types
 
 // Closure type: CONSTR_0_1
 #[repr(C)]
@@ -590,28 +775,6 @@ pub struct StgTRecHeader {
     pub enclosing_trec : *mut StgTRecHeader,
     pub current_chunk : *mut StgTRecChunk,
     pub state : TRecState,
-}
-
-#[repr(C)]
-pub struct StgAtomicallyFrame {
-    pub header : StgHeader,
-    pub code : TaggedClosureRef,
-    pub result : TaggedClosureRef,
-}
-
-#[repr(C)]
-pub struct StgCatchSTMFrame {
-    pub header : StgHeader,
-    pub code : TaggedClosureRef,
-    pub handler : TaggedClosureRef,
-}
-
-#[repr(C)]
-pub struct StgCatchRetryFrame {
-    pub header : StgHeader,
-    pub running_alt_code : StgWord,
-    pub first_code : TaggedClosureRef,
-    pub alt_code : TaggedClosureRef,
 }
 
 
