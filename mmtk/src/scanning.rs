@@ -18,7 +18,8 @@ fn scan_small_bitmap<EV: EdgeVisitor>(
     payload : &ClosurePayload,
     small_bitmap : StgSmallBitmap,
     ev: &mut EV,
-) {
+)
+{
     let size = small_bitmap.size();
     let mut bitmap = small_bitmap.bits();
 
@@ -35,7 +36,8 @@ fn scan_large_bitmap<EV: EdgeVisitor>(
     payload : &ClosurePayload,
     large_bitmap : &StgLargeBitmap,
     ev: &mut EV,
-) {
+)
+{
     let size_bits = large_bitmap.size;
     let mut b : usize = 0;
     let mut i : usize = 0;
