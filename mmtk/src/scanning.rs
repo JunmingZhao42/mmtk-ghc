@@ -1,4 +1,4 @@
-use crate::DummyVM;
+use crate::GHCVM;
 use mmtk::scheduler::*;
 use mmtk::util::opaque_pointer::*;
 use mmtk::vm::{EdgeVisitor, Scanning};
@@ -128,17 +128,17 @@ fn scan_srt<EV: EdgeVisitor>(
 //     }
 // }
 
-impl Scanning<DummyVM> for VMScanning {
-    fn scan_thread_roots<W: ProcessEdgesWork<VM = DummyVM>>() {
+impl Scanning<GHCVM> for VMScanning {
+    fn scan_thread_roots<W: ProcessEdgesWork<VM = GHCVM>>() {
         unimplemented!()
     }
-    fn scan_thread_root<W: ProcessEdgesWork<VM = DummyVM>>(
-        _mutator: &'static mut Mutator<DummyVM>,
+    fn scan_thread_root<W: ProcessEdgesWork<VM = GHCVM>>(
+        _mutator: &'static mut Mutator<GHCVM>,
         _tls: VMWorkerThread,
     ) {
         unimplemented!()
     }
-    fn scan_vm_specific_roots<W: ProcessEdgesWork<VM = DummyVM>>() {
+    fn scan_vm_specific_roots<W: ProcessEdgesWork<VM = GHCVM>>() {
         unimplemented!()
     }
 
@@ -234,9 +234,9 @@ impl Scanning<DummyVM> for VMScanning {
                     }
                 }
                 Closure::TSO(tso) => {
-                    // if tso.bound != null {
-                    //     ev.visit_edge(Address::from_ptr((&*tso.bound).tso));
-                    // }
+                    if tso.bound.is_null() {
+                        ev.visit_edge(Address::from_ptr((&*tso.bound).tso));
+                    }
                     ev.visit_edge(Address::from_ptr(tso.blocked_exceptions));
                     ev.visit_edge(Address::from_ptr(tso.blocking_queue));
                     ev.visit_edge(Address::from_ptr(tso.trec));

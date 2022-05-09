@@ -23,9 +23,9 @@ pub mod stg_info_table;
 mod tests;
 
 #[derive(Default)]
-pub struct DummyVM;
+pub struct GHCVM;
 
-impl VMBinding for DummyVM {
+impl VMBinding for GHCVM {
     type VMObjectModel = object_model::VMObjectModel;
     type VMScanning = scanning::VMScanning;
     type VMCollection = collection::VMCollection;
@@ -39,7 +39,7 @@ impl VMBinding for DummyVM {
     const MAX_ALIGNMENT: usize = Self::MIN_ALIGNMENT << Self::MAX_ALIGNMENT_SHIFT;
 }
 
-//#[cfg(feature = "dummyvm")]
+//#[cfg(feature = "GHCVM")]
 lazy_static! {
-    pub static ref SINGLETON: MMTK<DummyVM> = MMTK::new();
+    pub static ref SINGLETON: MMTK<GHCVM> = MMTK::new();
 }

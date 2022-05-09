@@ -3,7 +3,7 @@ use mmtk::util::metadata::header_metadata::HeaderMetadataSpec;
 use mmtk::util::{Address, ObjectReference};
 use mmtk::vm::*;
 use std::sync::atomic::Ordering;
-use crate::DummyVM;
+use crate::GHCVM;
 
 pub struct VMObjectModel {}
 
@@ -11,7 +11,7 @@ pub struct VMObjectModel {}
 // Change this if you want to test other values.
 pub const OBJECT_REF_OFFSET: usize = 6;
 
-impl ObjectModel<DummyVM> for VMObjectModel {
+impl ObjectModel<GHCVM> for VMObjectModel {
     const GLOBAL_LOG_BIT_SPEC: VMGlobalLogBitSpec = VMGlobalLogBitSpec::in_header(0);
     const LOCAL_FORWARDING_POINTER_SPEC: VMLocalForwardingPointerSpec = VMLocalForwardingPointerSpec::in_header(0);
     const LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec = VMLocalForwardingBitsSpec::in_header(0);
@@ -71,7 +71,7 @@ impl ObjectModel<DummyVM> for VMObjectModel {
     fn copy(
         _from: ObjectReference,
         _semantics: CopySemantics,
-        _copy_context: &mut GCWorkerCopyContext<DummyVM>,
+        _copy_context: &mut GCWorkerCopyContext<GHCVM>,
     ) -> ObjectReference {
         unimplemented!()
     }
