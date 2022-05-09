@@ -10,7 +10,7 @@ use mmtk::util::opaque_pointer::*;
 use mmtk::scheduler::{GCController, GCWorker};
 use mmtk::Mutator;
 use mmtk::MMTK;
-use crate::DummyVM;
+use crate::GHCVM;
 use crate::SINGLETON;
 
 #[no_mangle]
@@ -18,36 +18,36 @@ pub extern "C" fn mmtk_gc_init(heap_size: usize) {
     // # Safety
     // Casting `SINGLETON` as mutable is safe because `gc_init` will only be executed once by a single thread during startup.
     #[allow(clippy::cast_ref_to_mut)]
-    let singleton_mut = unsafe { &mut *(&*SINGLETON as *const MMTK<DummyVM> as *mut MMTK<DummyVM>) };
+    let singleton_mut = unsafe { &mut *(&*SINGLETON as *const MMTK<GHCVM> as *mut MMTK<GHCVM>) };
     memory_manager::gc_init(singleton_mut, heap_size)
 }
 
 #[no_mangle]
-pub extern "C" fn mmtk_bind_mutator(tls: VMMutatorThread) -> *mut Mutator<DummyVM> {
+pub extern "C" fn mmtk_bind_mutator(tls: VMMutatorThread) -> *mut Mutator<GHCVM> {
     Box::into_raw(memory_manager::bind_mutator(&SINGLETON, tls))
 }
 
 #[no_mangle]
-pub extern "C" fn mmtk_destroy_mutator(mutator: *mut Mutator<DummyVM>) {
+pub extern "C" fn mmtk_destroy_mutator(mutator: *mut Mutator<GHCVM>) {
     memory_manager::destroy_mutator(unsafe { Box::from_raw(mutator) })
 }
 
 #[no_mangle]
-pub extern "C" fn mmtk_alloc(mutator: *mut Mutator<DummyVM>, size: usize,
+pub extern "C" fn mmtk_alloc(mutator: *mut Mutator<GHCVM>, size: usize,
                     align: usize, offset: isize, mut semantics: AllocationSemantics) -> Address {
     if size >= SINGLETON.get_plan().constraints().max_non_los_default_alloc_bytes {
         semantics = AllocationSemantics::Los;
     }
-    memory_manager::alloc::<DummyVM>(unsafe { &mut *mutator }, size, align, offset, semantics)
+    memory_manager::alloc::<GHCVM>(unsafe { &mut *mutator }, size, align, offset, semantics)
 }
 
 #[no_mangle]
-pub extern "C" fn mmtk_post_alloc(mutator: *mut Mutator<DummyVM>, refer: ObjectReference,
+pub extern "C" fn mmtk_post_alloc(mutator: *mut Mutator<GHCVM>, refer: ObjectReference,
                                         bytes: usize, mut semantics: AllocationSemantics) {
     if bytes >= SINGLETON.get_plan().constraints().max_non_los_default_alloc_bytes {
         semantics = AllocationSemantics::Los;
     }
-    memory_manager::post_alloc::<DummyVM>(unsafe { &mut *mutator }, refer, bytes, semantics)
+    memory_manager::post_alloc::<GHCVM>(unsafe { &mut *mutator }, refer, bytes, semantics)
 }
 
 #[no_mangle]
@@ -56,13 +56,13 @@ pub extern "C" fn mmtk_will_never_move(object: ObjectReference) -> bool {
 }
 
 #[no_mangle]
-pub extern "C" fn mmtk_start_control_collector(tls: VMWorkerThread, controller: &'static mut GCController<DummyVM>) {
+pub extern "C" fn mmtk_start_control_collector(tls: VMWorkerThread, controller: &'static mut GCController<GHCVM>) {
     memory_manager::start_control_collector(&SINGLETON, tls, controller);
 }
 
 #[no_mangle]
-pub extern "C" fn mmtk_start_worker(tls: VMWorkerThread, worker: &'static mut GCWorker<DummyVM>) {
-    memory_manager::start_worker::<DummyVM>(&SINGLETON, tls, worker)
+pub extern "C" fn mmtk_start_worker(tls: VMWorkerThread, worker: &'static mut GCWorker<GHCVM>) {
+    memory_manager::start_worker::<GHCVM>(&SINGLETON, tls, worker)
 }
 
 #[no_mangle]
@@ -123,7 +123,7 @@ pub extern "C" fn mmtk_modify_check(object: ObjectReference) {
 
 #[no_mangle]
 pub extern "C" fn mmtk_handle_user_collection_request(tls: VMMutatorThread) {
-    memory_manager::handle_user_collection_request::<DummyVM>(&SINGLETON, tls);
+    memory_manager::handle_user_collection_request::<GHCVM>(&SINGLETON, tls);
 }
 
 #[no_mangle]

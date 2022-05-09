@@ -10,6 +10,7 @@ use mmtk::vm::VMBinding;
 use mmtk::MMTK;
 
 pub mod scanning;
+pub mod object_scanning;
 pub mod collection;
 pub mod object_model;
 pub mod active_plan;

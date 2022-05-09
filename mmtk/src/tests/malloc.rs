@@ -1,12 +1,12 @@
 use mmtk::util::malloc;
-use crate::DummyVM;
+use crate::GHCVM;
 
 #[test]
 fn test_malloc() {
-    let (address1, bool1) = malloc::alloc::<DummyVM>(16, 8, 0);
-    let (address2, bool2) = malloc::alloc::<DummyVM>(16, 32, 0);
-    let (address3, bool3) = malloc::alloc::<DummyVM>(16, 8, 4);
-    let (address4, bool4) = malloc::alloc::<DummyVM>(32, 64, 4);
+    let (address1, bool1) = malloc::alloc::<GHCVM>(16, 8, 0);
+    let (address2, bool2) = malloc::alloc::<GHCVM>(16, 32, 0);
+    let (address3, bool3) = malloc::alloc::<GHCVM>(16, 8, 4);
+    let (address4, bool4) = malloc::alloc::<GHCVM>(32, 64, 4);
 
     assert!(address1.is_aligned_to(8));
     assert!(address2.is_aligned_to(32));

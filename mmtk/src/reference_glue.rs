@@ -2,11 +2,11 @@ use mmtk::vm::ReferenceGlue;
 use mmtk::util::ObjectReference;
 use mmtk::TraceLocal;
 use mmtk::util::opaque_pointer::*;
-use crate::DummyVM;
+use crate::GHCVM;
 
 pub struct VMReferenceGlue {}
 
-impl ReferenceGlue<DummyVM> for VMReferenceGlue {
+impl ReferenceGlue<GHCVM> for VMReferenceGlue {
     fn set_referent(_reference: ObjectReference, _referent: ObjectReference) {
         unimplemented!()
     }

@@ -3,12 +3,12 @@ use mmtk::vm::GCThreadContext;
 use mmtk::MutatorContext;
 use mmtk::util::opaque_pointer::*;
 use mmtk::scheduler::*;
-use crate::DummyVM;
+use crate::GHCVM;
 
 pub struct VMCollection {}
 
-impl Collection<DummyVM> for VMCollection {
-    fn stop_all_mutators<E: ProcessEdgesWork<VM=DummyVM>>(_tls: VMWorkerThread) {
+impl Collection<GHCVM> for VMCollection {
+    fn stop_all_mutators<E: ProcessEdgesWork<VM=GHCVM>>(_tls: VMWorkerThread) {
         unimplemented!()
     }
 
@@ -20,11 +20,11 @@ impl Collection<DummyVM> for VMCollection {
         panic!("block_for_gc is not implemented")
     }
 
-    fn spawn_gc_thread(_tls: VMThread, _ctx: GCThreadContext<DummyVM>) {
+    fn spawn_gc_thread(_tls: VMThread, _ctx: GCThreadContext<GHCVM>) {
 
     }
 
-    fn prepare_mutator<T: MutatorContext<DummyVM>>(_tls_w: VMWorkerThread, _tls_m: VMMutatorThread, _mutator: &T) {
+    fn prepare_mutator<T: MutatorContext<GHCVM>>(_tls_w: VMWorkerThread, _tls_m: VMMutatorThread, _mutator: &T) {
         unimplemented!()
     }
 }

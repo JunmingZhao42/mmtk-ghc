@@ -2,13 +2,13 @@ use mmtk::Plan;
 use mmtk::vm::ActivePlan;
 use mmtk::util::opaque_pointer::*;
 use mmtk::Mutator;
-use crate::DummyVM;
+use crate::GHCVM;
 use crate::SINGLETON;
 
 pub struct VMActivePlan<> {}
 
-impl ActivePlan<DummyVM> for VMActivePlan {
-    fn global() -> &'static dyn Plan<VM=DummyVM> {
+impl ActivePlan<GHCVM> for VMActivePlan {
+    fn global() -> &'static dyn Plan<VM=GHCVM> {
         SINGLETON.get_plan()
     }
 
@@ -21,7 +21,7 @@ impl ActivePlan<DummyVM> for VMActivePlan {
         true
     }
 
-    fn mutator(_tls: VMMutatorThread) -> &'static mut Mutator<DummyVM> {
+    fn mutator(_tls: VMMutatorThread) -> &'static mut Mutator<GHCVM> {
         unimplemented!()
     }
 
@@ -29,7 +29,7 @@ impl ActivePlan<DummyVM> for VMActivePlan {
         unimplemented!()
     }
 
-    fn get_next_mutator() -> Option<&'static mut Mutator<DummyVM>> {
+    fn get_next_mutator() -> Option<&'static mut Mutator<GHCVM>> {
         unimplemented!()
     }
 }
