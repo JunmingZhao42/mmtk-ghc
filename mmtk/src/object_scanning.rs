@@ -50,7 +50,6 @@ pub fn scan_TSO<EV: EdgeVisitor>(
 
     ev.visit_edge(Address::from_ptr(tso.tso_link_prev));
     ev.visit_edge(Address::from_ptr(tso.tso_link_next));
-
 }
 
 #[allow(non_snake_case)]
@@ -80,7 +79,6 @@ pub fn scan_PAP_payload<EV: EdgeVisitor>(
             let small_bitmap = StgFunType::get_small_bitmap(&fun_info.f.fun_type);
             scan_small_bitmap(_tls, payload, small_bitmap, ev);
         }
-    
     }
 }
 
