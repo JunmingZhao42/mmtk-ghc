@@ -53,17 +53,15 @@ impl Scanning<GHCVM> for VMScanning {
                 }
                 Closure::Thunk(thunk) => {
                     let n_ptrs : u32 = (&*itbl).layout.payload.ptrs;
-                    for n in 0..n_ptrs {
-                        let edge = thunk.payload.get(n as usize);
-                        ev.visit_edge(edge.to_address());
-                    }
+                    scan_closure_payload(_tls, &thunk.payload, n_ptrs, ev);
                 }
-                Closure::Constr(closr) => {
-                    let n_ptrs : u32 = (&*itbl).layout.payload.ptrs;
-                    for n in 0..n_ptrs {
-                        let edge = closr.payload.get(n as usize);
-                        ev.visit_edge(edge.to_address());
-                    }
+                Closure::Constr(closure) => {
+                    let n_ptrs = (&*itbl).layout.payload.ptrs;
+                    scan_closure_payload(_tls, &closure.payload, n_ptrs, ev);
+                }
+                Closure::Fun(fun) => {
+                    let n_ptrs = (&*itbl).layout.payload.ptrs;
+                    scan_closure_payload(_tls, &fun.payload, n_ptrs, ev);
                 }
                 Closure::Weak(weak) => {
                     ev.visit_edge(weak.value.to_address());
@@ -71,7 +69,11 @@ impl Scanning<GHCVM> for VMScanning {
                     ev.visit_edge(weak.finalizer.to_address());
                     ev.visit_edge(weak.cfinalizers.to_address());
                 }
+                Closure::MutVar(mut_var) => {
+                    ev.visit_edge(mut_var.var.to_address());
+                }
                 Closure::BlockingQueue(bq) => {
+                    ev.visit_edge(bq.bh.to_address());
                     ev.visit_edge(Address::from_ptr(bq.owner));
                     ev.visit_edge(Address::from_ptr(bq.queue));
                     ev.visit_edge(Address::from_ptr(bq.link));
@@ -83,35 +85,28 @@ impl Scanning<GHCVM> for VMScanning {
                     ev.visit_edge(fun.fun.to_address());
                     scan_stack(_tls, fun.iter(), ev);
                 }
-                // TODO: FUN
-                // TODO: PAP and AP using same struct?
-                Closure::PartialAppliedFun(fun) => {
-                    ev.visit_edge(fun.fun.to_address());
-                    // TODO: scavenge_PAP_payload
+                Closure::PartialAP(pap) => {
+                    ev.visit_edge(pap.fun.to_address());
+                    let size : usize = pap.n_args as usize;
+                    let fun_info : & StgFunInfoTable = 
+                        StgFunInfoTable::from_info_table(pap.fun.get_info_table());
+                    let payload : &ClosurePayload = &pap.payload;
+                    scan_PAP_payload(_tls, fun_info, payload, size, ev);
                 }
-                Closure::AppliedFun(fun) => {
-                    ev.visit_edge(fun.fun.to_address());
-                    // TODO: scavenge_AP (just call scavenge_PAP_payload ?)
+                Closure::AP(ap) => {
+                    ev.visit_edge(ap.fun.to_address());
+                    let size : usize = ap.n_args as usize;
+                    let fun_info : & StgFunInfoTable = 
+                        StgFunInfoTable::from_info_table(ap.fun.get_info_table());
+                    let payload : &ClosurePayload = &ap.payload;
+                    scan_PAP_payload(_tls, fun_info, payload, size, ev);
                 }
                 Closure::ArrBytes(_) => { return; }
                 Closure::ArrMutPtr(array) => {
-                    // TODO: scavenge_mut_arr_ptrs
-                    // use scavenge_mut_arr_ptrs
-                    // TODO: use the optimised version later for card marking
-                    // should mark the bits : mark everything to 0 
-                    // (bool: whether there's an inter generation pointer (old to young))
-                    let n_ptrs = array.ptrs;
-                    for n in 0..n_ptrs {
-                        let edge = array.payload.get(n as usize);
-                        ev.visit_edge(edge.to_address());
-                    }
+                    scan_mut_arr_ptrs(_tls, array, ev);
                 }
                 Closure::ArrMutPtrSmall(array) => {
-                    let n_ptrs = array.ptrs;
-                    for n in 0..n_ptrs {
-                        let edge = array.payload.get(n);
-                        ev.visit_edge(edge.to_address());
-                    }
+                    scan_closure_payload(_tls, &array.payload, array.ptrs as u32, ev)
                 }
                 Closure::TSO(tso) => {
                     scan_TSO(_tls, tso, ev);
@@ -131,10 +126,10 @@ impl Scanning<GHCVM> for VMScanning {
                     }
                 }
                 Closure::Indirect(ind) => {
-                    ev.visit_edge(Address::from_ptr(ind.indirectee.to_ptr()));
+                    ev.visit_edge(ind.indirectee.to_address());
                 }
                 Closure::IndirectStatic(ind) => {
-                    ev.visit_edge(Address::from_ptr(ind.indirectee.to_ptr()));
+                    ev.visit_edge(ind.indirectee.to_address());
                 }
                 // TODO: scavenge_compact for COMPACT_NFDATA?
                 _ => panic!("scavenge_one: strange object type={:?}, address={:?}", 

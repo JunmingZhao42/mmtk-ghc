@@ -1,21 +1,10 @@
 // use crate::DummyVM;
 use super::types::*;
 use super::stg_info_table::*;
+use super::util::*;
 use mmtk::util::{Address, ObjectReference};
 use std::mem::size_of;
 
-
-fn offset_bytes<T>(ptr: *const T, n: isize) -> *const T {
-    unsafe {
-        ptr.cast::<u8>().offset(n).cast()
-    }
-}    
-
-fn offset_words<T>(ptr: *const T, n: isize) -> *const T {
-    unsafe {
-        ptr.cast::<StgWord>().offset(n).cast()
-    }
-}
 
 // ------------ Closures.h ------------
 
@@ -72,8 +61,8 @@ pub enum Closure {
     ThunkSelector(&'static StgSelector),
 
     Fun(&'static StgClosure),
-    PartialAppliedFun(&'static StgPAP),
-    AppliedFun(&'static StgAP),
+    PartialAP(&'static StgPAP),
+    AP(&'static StgAP),
     ApStack(&'static StgAP_STACK),
 
     Indirect(&'static StgInd),
@@ -106,48 +95,73 @@ impl Closure{
             let info: &'static StgInfoTable = &*(*p).header.info_table;
             use StgClosureType::*;
             match info.type_ {
-                // MUT_PRIM ?
-                CONSTR | CONSTR_1_0 | CONSTR_0_1 | CONSTR_2_0 | CONSTR_1_1 | CONSTR_0_2 | MUT_PRIM => 
-                    Closure::Constr(&*(p as *const StgClosure)),
-                THUNK | THUNK_1_0 | THUNK_0_1 | THUNK_2_0 | THUNK_1_1 | THUNK_0_2 => 
-                    Closure::Thunk(&*(p as *const StgThunk)),
-                THUNK_SELECTOR => 
-                    Closure::ThunkSelector(&*(p as *const StgSelector)),
-                PAP => 
-                    Closure::PartialAppliedFun(&*(p as *const StgPAP)),
-                AP => 
-                    Closure::AppliedFun(&*(p as *const StgAP)),
-                AP_STACK => 
-                    Closure::ApStack(&*(p as *const StgAP_STACK)),
-                IND | BLACKHOLE => 
-                    Closure::Indirect(&*(p as *const StgInd)),
-                IND_STATIC => 
-                    Closure::IndirectStatic(&*(p as *const StgIndStatic)),
-                BLOCKING_QUEUE => 
-                    Closure::BlockingQueue(&*(p as *const StgBlockingQueue)),
-                ARR_WORDS => 
-                    Closure::ArrBytes(&*(p as *const StgArrBytes)),
-                MUT_ARR_PTRS_FROZEN_DIRTY | MUT_ARR_PTRS_FROZEN_CLEAN => 
-                    Closure::ArrMutPtr(&*(p as *const StgMutArrPtrs)),
-                SMALL_MUT_ARR_PTRS_CLEAN | SMALL_MUT_ARR_PTRS_DIRTY | SMALL_MUT_ARR_PTRS_FROZEN_DIRTY |
-                SMALL_MUT_ARR_PTRS_FROZEN_CLEAN =>
-                    Closure::ArrMutPtrSmall(&*(p as *const StgSmallMutArrPtrs)),
-                MUT_VAR_CLEAN | MUT_VAR_DIRTY =>
-                    Closure::MutVar(&*(p as *const StgMutVar)),
-                STACK =>
-                    Closure::Stack(&*(p as *const StgStack)),
-                WEAK =>
-                    Closure::Weak(&*(p as *const StgWeak)),
-                BCO =>
-                    Closure::ByteCodeObj(&*(p as *const StgBCO)),
-                MVAR_CLEAN | MVAR_DIRTY =>
-                    Closure::MVar(&*(p as *const StgMVar)),
-                TVAR =>
-                    Closure::TVar(&*(p as *const StgTVar)),
-                TSO =>
-                    Closure::TSO(&*(p as *const StgTSO)),
-                TREC_CHUNK =>
-                    Closure::TRecChunk(&*(p as *const StgTRecChunk)),
+                // what are PRIM and MUT_PRIM?
+                CONSTR | CONSTR_NOCAF | CONSTR_1_0 | CONSTR_0_1 | CONSTR_2_0 | 
+                CONSTR_1_1 | CONSTR_0_2 | PRIM | MUT_PRIM => {
+                    Closure::Constr(&*(p as *const StgClosure))
+                }
+                THUNK | THUNK_1_0 | THUNK_0_1 | THUNK_2_0 | THUNK_1_1 | THUNK_0_2 => {
+                    Closure::Thunk(&*(p as *const StgThunk))
+                }
+                THUNK_SELECTOR => {
+                    Closure::ThunkSelector(&*(p as *const StgSelector))
+                }
+                FUN | FUN_1_0 | FUN_0_1 | FUN_1_1 | FUN_0_2 | FUN_2_0 => {
+                    Closure::Fun(&*(p as *const StgClosure))
+                }
+                PAP => {
+                    Closure::PartialAP(&*(p as *const StgPAP))
+                }
+                AP => { 
+                    Closure::AP(&*(p as *const StgAP))
+                }
+                AP_STACK => {
+                    Closure::ApStack(&*(p as *const StgAP_STACK))
+                }
+                IND | BLACKHOLE => {
+                    Closure::Indirect(&*(p as *const StgInd))
+                }
+                IND_STATIC => {
+                    Closure::IndirectStatic(&*(p as *const StgIndStatic))
+                }
+                BLOCKING_QUEUE => {
+                    Closure::BlockingQueue(&*(p as *const StgBlockingQueue))
+                }
+                ARR_WORDS => {
+                    Closure::ArrBytes(&*(p as *const StgArrBytes)) 
+                }
+                MUT_ARR_PTRS_CLEAN | MUT_ARR_PTRS_DIRTY |
+                MUT_ARR_PTRS_FROZEN_DIRTY | MUT_ARR_PTRS_FROZEN_CLEAN => {
+                    Closure::ArrMutPtr(&*(p as *const StgMutArrPtrs))
+                }
+                SMALL_MUT_ARR_PTRS_CLEAN | SMALL_MUT_ARR_PTRS_DIRTY | 
+                SMALL_MUT_ARR_PTRS_FROZEN_DIRTY | SMALL_MUT_ARR_PTRS_FROZEN_CLEAN => {
+                    Closure::ArrMutPtrSmall(&*(p as *const StgSmallMutArrPtrs))
+                }
+                MUT_VAR_CLEAN | MUT_VAR_DIRTY => {
+                    Closure::MutVar(&*(p as *const StgMutVar)) 
+                }
+                STACK => {
+                    Closure::Stack(&*(p as *const StgStack)) 
+                }
+                WEAK => {
+                    Closure::Weak(&*(p as *const StgWeak))
+                }
+                // TODO: BCO => {
+                //     Closure::ByteCodeObj(&*(p as *const StgBCO))
+                // }
+                MVAR_CLEAN | MVAR_DIRTY => {
+                    Closure::MVar(&*(p as *const StgMVar))
+                }
+                TVAR => {
+                    Closure::TVar(&*(p as *const StgTVar)) 
+                }
+                TSO => {
+                    Closure::TSO(&*(p as *const StgTSO)) 
+                }
+                TREC_CHUNK => {
+                    Closure::TRecChunk(&*(p as *const StgTRecChunk))
+                }
 
                 _ => panic!("info={:?} address={:?}", info, info as *const StgInfoTable)
             }
@@ -249,7 +263,7 @@ pub struct StgAP_STACK {
 }
 
 impl StgAP_STACK {
-    pub fn iter(&self) -> StackIterator {
+    pub unsafe fn iter(&self) -> StackIterator {
         let start : *const StgStackFrame = (&self.payload as *const ClosurePayload).cast();
         StackIterator{
             current : start,
@@ -370,7 +384,7 @@ pub struct StgArrBytes {
 #[derive(Debug)]
 pub struct StgMutArrPtrs {
     pub header : StgHeader,
-    pub ptrs : StgWord,
+    pub n_ptrs : StgWord,
     pub size : StgWord,
     pub payload : ClosurePayload,
 }

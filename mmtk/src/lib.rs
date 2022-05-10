@@ -19,6 +19,7 @@ pub mod api;
 pub mod types;
 pub mod stg_closures;
 pub mod stg_info_table;
+pub mod util;
 
 #[cfg(test)]
 mod tests;

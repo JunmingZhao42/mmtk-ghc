@@ -1,6 +1,6 @@
-// use crate::DummyVM;
 use super::types::*;
 use super::stg_closures::*;
+use super::util::*;
 use std::fmt;
 use std::ops::Deref;
 
@@ -55,7 +55,7 @@ impl ClosureFlag {
    Bitmaps
    -------------------------------------------------------------------------- */
 pub union Bitmap {
-    pub small_bitmap        : StgSmallBitmap,
+    pub small_bitmap       : StgSmallBitmap,
     pub large_bitmap_ref   : StgLargeBitmapRef,
 }
 
@@ -118,10 +118,9 @@ pub struct StgLargeBitmapRef {
 
 impl StgLargeBitmapRef {
     // relative to the beginning of the infotable of the closure
-    pub fn deref(&self, itbl: &StgInfoTable) -> *const StgLargeBitmap {
-        unsafe {
-            offset_from_end(itbl, self.offset as isize)
-        }
+    pub unsafe fn deref<InfoTable>(&self, itbl: &InfoTable) -> *const StgLargeBitmap {
+        // TODO: make sure itbl is an info table
+        offset_from_end(itbl, self.offset as isize)
     }
 }
 
@@ -182,15 +181,13 @@ pub struct StgProfInfo {} // TODO: handle profiling case
 pub struct TntcRef<T> (*const T);
 
 impl<T> TntcRef<T> {
-    pub fn get_ptr(&self) -> *const T {
+    pub unsafe fn get_ptr(&self) -> *const T {
         // some info table not always valid
         // load and unload codes make info table invalid
-        unsafe {
-            if true || cfg!(tables_next_to_code) {
-                self.0.offset(-1)
-            } else {
-                self.0
-            }
+        if true || cfg!(tables_next_to_code) {
+            self.0.offset(-1)
+        } else {
+            self.0
         }
     }
 }
@@ -284,12 +281,7 @@ impl StgRetInfoTable {
     }
 }
 
-/// Compute a pointer to a structure from an offset relative
-/// to the end of another structure.
-unsafe fn offset_from_end<Src, Target>(ptr: &Src, offset: isize) -> *const Target {
-    let end = (ptr as *const Src).offset(1);
-    (end as *const u8).offset(offset).cast()
-}
+
 /* -----------------------------------------------------------------------------
    Thunk info tables
    -------------------------------------------------------------------------- */
@@ -323,8 +315,6 @@ pub struct StgConInfoTable {
 // TODO: implement other macros
 
 #[no_mangle]
-pub extern "C" fn print_obj(obj : TaggedClosureRef){
-    unsafe{
-        println!("{:?}", Closure::from_ptr(obj.to_ptr()));
-    }
+pub extern "C" fn print_obj(obj : TaggedClosureRef){  
+    println!("{:?}", Closure::from_ptr(obj.to_ptr()));
 }
