@@ -59,11 +59,13 @@ pub enum Closure {
 
     Thunk(&'static StgThunk),
     ThunkSelector(&'static StgSelector),
+    ThunkStatic(&'static StgClosure),
 
     Fun(&'static StgClosure),
     PartialAP(&'static StgPAP),
     AP(&'static StgAP),
     ApStack(&'static StgAP_STACK),
+    FunStatic(&'static StgClosure),
 
     Indirect(&'static StgInd),
     IndirectStatic(&'static StgIndStatic),
@@ -105,8 +107,14 @@ impl Closure{
             THUNK_SELECTOR => {
                 Closure::ThunkSelector(&*(p as *const StgSelector))
             }
+            THUNK_STATIC => {
+                Closure::ThunkStatic(&*(p as *const StgClosure))
+            }
             FUN | FUN_1_0 | FUN_0_1 | FUN_1_1 | FUN_0_2 | FUN_2_0 => {
                 Closure::Fun(&*(p as *const StgClosure))
+            }
+            FUN_STATIC => {
+                Closure::FunStatic(&*(p as *const StgClosure))
             }
             PAP => {
                 Closure::PartialAP(&*(p as *const StgPAP))

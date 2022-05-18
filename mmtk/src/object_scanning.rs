@@ -84,6 +84,10 @@ pub fn scan_PAP_payload<EV: EdgeVisitor>(
 
 static MUT_ARR_PTRS_CARD_BITS : usize = 7;
 
+
+/**
+ * Scan mutable arrays of pointers
+ */
 pub unsafe fn scan_mut_arr_ptrs<EV: EdgeVisitor>(
     // _tls: VMWorkerThread,
     array : &StgMutArrPtrs,
@@ -92,7 +96,7 @@ pub unsafe fn scan_mut_arr_ptrs<EV: EdgeVisitor>(
 {
     let n_cards : StgWord = (array.n_ptrs + (1 << MUT_ARR_PTRS_CARD_BITS) - 1) 
                             >> MUT_ARR_PTRS_CARD_BITS;
-    // why -1?
+    // scan card 0..n-1
     for m in 0..n_cards-1 {
         // m-th card, iterate through 2^MUT_ARR_PTRS_CARD_BITS many elements
         for p in m*(1<<MUT_ARR_PTRS_CARD_BITS) .. (m+1)*(1<<MUT_ARR_PTRS_CARD_BITS) {
@@ -107,7 +111,7 @@ pub unsafe fn scan_mut_arr_ptrs<EV: EdgeVisitor>(
         }
     }
 
-    // TODO: what is this part?
+    // scan the last card (no need to scan entirely)
     for p in (n_cards-1)*(1<<MUT_ARR_PTRS_CARD_BITS) .. array.n_ptrs {
         let edge = array.payload.get(p);
         ev.visit_edge(edge.to_address());
@@ -187,26 +191,26 @@ pub fn scan_stack<EV: EdgeVisitor>(
             RET_SMALL(frame, bitmap) => {
                 let payload : &'static ClosurePayload = &frame.payload;
                 scan_small_bitmap( payload, bitmap, ev);
-                scan_srt( &frame.header.info_table, ev);
+                scan_srt(&frame.header.info_table, ev);
             }
             RET_BIG(frame, bitmap_ref) => {
                 let payload : &'static ClosurePayload = &frame.payload;
                 let size : usize = bitmap_ref.size;
                 scan_large_bitmap( payload, bitmap_ref, size, ev);
-                scan_srt( &frame.header.info_table, ev);
+                scan_srt(&frame.header.info_table, ev);
             }
             RET_FUN_SMALL(frame, bitmap) => {
                 ev.visit_edge(frame.fun.to_address());
                 let payload : &'static ClosurePayload = &frame.payload;
-                scan_small_bitmap( payload, bitmap, ev);
-                scan_srt( &frame.info_table, ev);
+                scan_small_bitmap(payload, bitmap, ev);
+                scan_srt(&frame.info_table, ev);
             }
             RET_FUN_LARGE(frame, bitmap_ref) => {
                 ev.visit_edge(frame.fun.to_address());
                 let payload : &'static ClosurePayload = &frame.payload;
                 let size : usize = bitmap_ref.size;
-                scan_large_bitmap( payload, bitmap_ref, size, ev);
-                scan_srt( &frame.info_table, ev);
+                scan_large_bitmap(payload, bitmap_ref, size, ev);
+                scan_srt(&frame.info_table, ev);
             }
             _ => panic!("Unexpected stackframe type {:?}", stackframe)
        }
@@ -229,3 +233,34 @@ pub fn scan_srt<EV: EdgeVisitor>(
     }
 }
 
+pub fn scan_srt_thunk<EV: EdgeVisitor>(
+    // _tls: VMWorkerThread,
+    thunk_info_table : &StgThunkInfoTable,
+    ev: &mut EV,
+)
+{
+    // TODO: only for major gc
+    // TODO: non USE_INLINE_SRT_FIELD
+    match thunk_info_table.get_srt() {
+        None => (),
+        Some(srt) => {
+            ev.visit_edge(Address::from_ptr(srt));
+        }
+    }
+}
+
+pub fn scan_srt_fun<EV: EdgeVisitor>(
+    // _tls: VMWorkerThread,
+    fun_info_table : &StgFunInfoTable,
+    ev: &mut EV,
+)
+{
+    // TODO: only for major gc
+    // TODO: non USE_INLINE_SRT_FIELD
+    match fun_info_table.get_srt() {
+        None => (),
+        Some(srt) => {
+            ev.visit_edge(Address::from_ptr(srt));
+        }
+    }
+}

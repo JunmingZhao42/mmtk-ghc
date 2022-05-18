@@ -100,12 +100,10 @@ pub struct StgLargeBitmap {
 pub struct LargeBitMapPayload {}
 
 impl LargeBitMapPayload {
-    pub fn get_w(&self, i: usize) -> *const StgWord {
-        unsafe {
-            let ptr: *const LargeBitMapPayload = &*self;
-            let payload: *const *mut StgWord = ptr.cast();
-            *payload.offset(i as isize)
-        }
+    pub unsafe fn get_w(&self, i: usize) -> *const StgWord {
+        let ptr: *const LargeBitMapPayload = &*self;
+        let payload: *const *mut StgWord = ptr.cast();
+        *payload.offset(i as isize)
     }
     // TODO: might want to iterate through bits as well
 }
@@ -205,6 +203,7 @@ impl<T> Deref for TntcRef<T> {
 pub type StgInfoTableRef = TntcRef<StgInfoTable>;
 pub type StgRetInfoTableRef = TntcRef<StgRetInfoTable>;
 pub type StgFunInfoTableRef = TntcRef<StgFunInfoTable>;
+pub type StgThunkInfoTableRef = TntcRef<StgThunkInfoTable>;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -254,6 +253,17 @@ impl StgFunInfoTable {
             &*(itbl.offset(1) as *const StgInfoTable).offset(-1)
         }
     }
+
+    pub fn get_srt(&self) -> Option<*const StgClosure> {
+        unsafe {
+            if self.i.srt.srt != 0 {
+                Some(offset_from_end(self, self.i.srt.srt as isize))
+            }
+            else {
+                None
+            }
+        }
+    }
 }
 
 /* -----------------------------------------------------------------------------
@@ -294,9 +304,28 @@ pub struct StgThunkInfoTable {
 }
 
 impl StgThunkInfoTable {
-    pub fn get_srt(&self) -> *const StgClosure {
+    pub fn get_srt(&self) -> Option<*const StgClosure> {
         unsafe {
-            offset_from_end(self, self.i.srt.srt as isize)
+            if self.i.srt.srt != 0 {
+                Some(offset_from_end(self, self.i.srt.srt as isize))
+            }
+            else {
+                None
+            }
+        }
+    }
+
+    pub fn from_info_table(itbl : &'static StgInfoTable) -> &'static StgThunkInfoTable {
+        unsafe {
+            let itbl = itbl as *const StgInfoTable;
+            &*(itbl.offset(1) as *const StgThunkInfoTable).offset(-1)
+        }
+    }
+
+    pub fn to_info_table(itbl : &'static StgThunkInfoTable) ->  &'static StgInfoTable {
+        unsafe {
+            let itbl = itbl as *const StgThunkInfoTable;
+            &*(itbl.offset(1) as *const StgInfoTable).offset(-1)
         }
     }
 }
@@ -314,7 +343,7 @@ pub struct StgConInfoTable {
 }
 
 impl StgConInfoTable {
-    pub unsafe fn con_desc(&self) -> &'static std::ffi::CStr{
+    pub unsafe fn con_desc(&self) -> &'static std::ffi::CStr {
         std::ffi::CStr::from_ptr(offset_from_end(self, self.con_desc_offset as isize))
     }
 

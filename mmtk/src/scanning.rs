@@ -26,18 +26,11 @@ impl Scanning<GHCVM> for VMScanning {
         unimplemented!()
     }
 
-    /// Delegated scanning of a object, visiting each pointer field
-    /// encountered.
-    ///
-    /// Arguments:
-    /// * `tls`: The VM-specific thread-local storage for the current worker.
-    /// * `object`: The object to be scanned.
-    /// * `edge_visitor`: Called back for each edge.
     fn scan_object<EV: EdgeVisitor>(
         _tls: VMWorkerThread,
         obj: ObjectReference,
         ev: &mut EV,
-    ) 
+    )
     {
         let closure_ref = TaggedClosureRef::from_object_reference(obj);            
         visit_closure(closure_ref, ev);
@@ -55,6 +48,10 @@ impl Scanning<GHCVM> for VMScanning {
     }
 }
 
+/**
+ * Visit the pointers inside a closure, depending on its closure type
+ * See rts/sm/Scav.c:scavenge_one()
+ */
 pub fn visit_closure<EV : EdgeVisitor>(closure_ref: TaggedClosureRef, ev: &mut EV) {
     let itbl: &'static StgInfoTable = closure_ref.get_info_table();
 
@@ -133,7 +130,7 @@ pub fn visit_closure<EV : EdgeVisitor>(closure_ref: TaggedClosureRef, ev: &mut E
         }
         Closure::TRecChunk(trec_chunk) => {
             ev.visit_edge(Address::from_ptr(trec_chunk.prev_chunk));
-
+            // visit payload
             let n_ptrs = trec_chunk.next_entry_idx;
             for n in 0..n_ptrs {
                 let trec_entry = &trec_chunk.entries[n];
@@ -145,10 +142,20 @@ pub fn visit_closure<EV : EdgeVisitor>(closure_ref: TaggedClosureRef, ev: &mut E
         Closure::Indirect(ind) => {
             ev.visit_edge(ind.indirectee.to_address());
         }
+        // scan static: see rts/sm/Scav.c:scavenge_static
         Closure::IndirectStatic(ind) => {
             ev.visit_edge(ind.indirectee.to_address());
         }
-        // TODO: scavenge_compact for COMPACT_NFDATA?
+        Closure::ThunkStatic(_) => {
+            let thunk_info = StgThunkInfoTable::from_info_table(itbl);
+            scan_srt_thunk(thunk_info, ev);
+        }
+        Closure::FunStatic(_) => {
+            let fun_info = StgFunInfoTable::from_info_table(itbl);
+            scan_srt_fun(fun_info, ev);
+        }
+        
+        // TODO: scavenge_compact for COMPACT_NFDATA
         _ => panic!("scavenge_one: strange object type={:?}, address={:?}", 
                     (&*itbl).type_, itbl)                
     }
