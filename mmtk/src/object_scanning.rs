@@ -184,6 +184,7 @@ pub fn scan_stack<EV: EdgeVisitor>(
     ev: &mut EV,
 )
 {
+    println!("CALLING SCAN STACK");
     for stackframe in stack {
         use StackFrame::*;
         match stackframe {
