@@ -86,7 +86,7 @@ pub enum Closure {
 
     TRecChunk(&'static StgTRecChunk),
     
-
+    // TODO: static pointers?
 }
 
 impl Closure{
@@ -180,7 +180,7 @@ pub struct StgClosure {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct TaggedClosureRef (*mut StgClosure);
 
 impl TaggedClosureRef {
@@ -199,7 +199,7 @@ impl TaggedClosureRef {
 
     pub fn get_info_table(&self) -> &'static StgInfoTable {
         unsafe{
-            &*(*self.0).header.info_table
+            &*(*self.to_ptr()).header.info_table
         }
     }
     
@@ -209,6 +209,14 @@ impl TaggedClosureRef {
 
     pub fn to_address(&self) -> Address {
         Address::from_ptr(self.to_ptr())
+    }
+
+    pub fn from_address(address : Address) -> Self {
+        TaggedClosureRef(address.to_mut_ptr())
+    }
+
+    pub fn from_ptr(ptr : *mut StgClosure) -> Self {
+        TaggedClosureRef(ptr)
     }
 }
 

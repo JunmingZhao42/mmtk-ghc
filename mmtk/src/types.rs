@@ -1,5 +1,5 @@
 // use crate::DummyVM;
-use super::stg_closures::*;
+// use super::stg_closures::*;
 use super::stg_info_table::*;
 
 

@@ -301,20 +301,36 @@ impl StgThunkInfoTable {
     }
 }
 
-// for testing
+
 /* -----------------------------------------------------------------------------
    Constructor info tables
    -------------------------------------------------------------------------- */
 #[repr(C)]
 pub struct StgConInfoTable {
     // TODO: handle non TABLES_NEXT_TO_CODE
-    pub con_desc_offset : StgInt,
+    pub con_desc_offset : StgHalfInt,
+    pub padding         : StgHalfInt,
     pub i               : StgInfoTable,
 }
 
-// TODO: implement other macros
+impl StgConInfoTable {
+    pub unsafe fn con_desc(&self) -> &'static std::ffi::CStr{
+        std::ffi::CStr::from_ptr(offset_from_end(self, self.con_desc_offset as isize))
+    }
 
-#[no_mangle]
-pub extern "C" fn print_obj(obj : TaggedClosureRef){  
-    println!("{:?}", Closure::from_ptr(obj.to_ptr()));
+    pub fn from_info_table(itbl : &'static StgInfoTable) -> &'static StgConInfoTable {
+        unsafe {
+            let itbl = itbl as *const StgInfoTable;
+            &*(itbl.offset(1) as *const StgConInfoTable).offset(-1)
+        }
+    }
+
+    pub fn to_info_table(itbl : &'static StgConInfoTable) ->  &'static StgInfoTable {
+        unsafe {
+            let itbl = itbl as *const StgConInfoTable;
+            &*(itbl.offset(1) as *const StgInfoTable).offset(-1)
+        }
+    }
 }
+
+// TODO: implement other macros

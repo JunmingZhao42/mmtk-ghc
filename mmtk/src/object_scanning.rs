@@ -1,4 +1,4 @@
-use mmtk::util::opaque_pointer::*;
+// use mmtk::util::opaque_pointer::*;
 use mmtk::vm::{EdgeVisitor};
 use mmtk::util::{Address};
 
@@ -10,7 +10,7 @@ use std::cmp::min;
 use std::mem::size_of;
 
 pub fn scan_closure_payload<EV: EdgeVisitor>(
-    _tls: VMWorkerThread,
+    // _tls: VMWorkerThread,
     payload : &ClosurePayload,
     n_ptrs : u32,
     ev: &mut EV,
@@ -24,7 +24,7 @@ pub fn scan_closure_payload<EV: EdgeVisitor>(
 
 #[allow(non_snake_case)]
 pub fn scan_TSO<EV: EdgeVisitor>(
-    _tls: VMWorkerThread,
+    // _tls: VMWorkerThread,
     tso : &StgTSO,
     ev: &mut EV,
 )
@@ -54,7 +54,7 @@ pub fn scan_TSO<EV: EdgeVisitor>(
 
 #[allow(non_snake_case)]
 pub fn scan_PAP_payload<EV: EdgeVisitor>(
-    _tls: VMWorkerThread,
+    // _tls: VMWorkerThread,
     fun_info: &StgFunInfoTable,
     payload : &ClosurePayload,
     size : usize,
@@ -67,17 +67,17 @@ pub fn scan_PAP_payload<EV: EdgeVisitor>(
     match fun_info.f.fun_type {
         ARG_GEN => unsafe {
             let small_bitmap : StgSmallBitmap = fun_info.f.bitmap.small_bitmap;
-            scan_small_bitmap(_tls, payload, small_bitmap, ev);
+            scan_small_bitmap( payload, small_bitmap, ev);
         }
         ARG_GEN_BIG => unsafe {
             let large_bitmap : &StgLargeBitmap = 
                 &*(fun_info.f.bitmap.large_bitmap_ref.deref(fun_info));
-            scan_large_bitmap(_tls, payload, large_bitmap, size, ev);
+            scan_large_bitmap( payload, large_bitmap, size, ev);
         }
         // TODO: handle ARG_BCO case
         _ => {
             let small_bitmap = StgFunType::get_small_bitmap(&fun_info.f.fun_type);
-            scan_small_bitmap(_tls, payload, small_bitmap, ev);
+            scan_small_bitmap( payload, small_bitmap, ev);
         }
     }
 }
@@ -85,7 +85,7 @@ pub fn scan_PAP_payload<EV: EdgeVisitor>(
 static MUT_ARR_PTRS_CARD_BITS : usize = 7;
 
 pub unsafe fn scan_mut_arr_ptrs<EV: EdgeVisitor>(
-    _tls: VMWorkerThread,
+    // _tls: VMWorkerThread,
     array : &StgMutArrPtrs,
     ev: &mut EV,
 )
@@ -124,7 +124,7 @@ pub unsafe fn scan_mut_arr_ptrs<EV: EdgeVisitor>(
 }
 
 pub fn scan_small_bitmap<EV: EdgeVisitor>(
-    _tls: VMWorkerThread,
+    // _tls: VMWorkerThread,
     payload : &ClosurePayload,
     small_bitmap : StgSmallBitmap,
     ev: &mut EV,
@@ -142,7 +142,7 @@ pub fn scan_small_bitmap<EV: EdgeVisitor>(
 }
 
 pub fn scan_large_bitmap<EV: EdgeVisitor>(
-    _tls: VMWorkerThread,
+    // _tls: VMWorkerThread,
     payload : &ClosurePayload,
     large_bitmap : &StgLargeBitmap,
     size : usize,
@@ -173,7 +173,7 @@ pub fn scan_large_bitmap<EV: EdgeVisitor>(
 
 
 pub fn scan_stack<EV: EdgeVisitor>(
-    _tls: VMWorkerThread,
+    // _tls: VMWorkerThread,
     stack : StackIterator,
     ev: &mut EV,
 )
@@ -186,27 +186,27 @@ pub fn scan_stack<EV: EdgeVisitor>(
             }
             RET_SMALL(frame, bitmap) => {
                 let payload : &'static ClosurePayload = &frame.payload;
-                scan_small_bitmap(_tls, payload, bitmap, ev);
-                scan_srt(_tls, &frame.header.info_table, ev);
+                scan_small_bitmap( payload, bitmap, ev);
+                scan_srt( &frame.header.info_table, ev);
             }
             RET_BIG(frame, bitmap_ref) => {
                 let payload : &'static ClosurePayload = &frame.payload;
                 let size : usize = bitmap_ref.size;
-                scan_large_bitmap(_tls, payload, bitmap_ref, size, ev);
-                scan_srt(_tls, &frame.header.info_table, ev);
+                scan_large_bitmap( payload, bitmap_ref, size, ev);
+                scan_srt( &frame.header.info_table, ev);
             }
             RET_FUN_SMALL(frame, bitmap) => {
                 ev.visit_edge(frame.fun.to_address());
                 let payload : &'static ClosurePayload = &frame.payload;
-                scan_small_bitmap(_tls, payload, bitmap, ev);
-                scan_srt(_tls, &frame.info_table, ev);
+                scan_small_bitmap( payload, bitmap, ev);
+                scan_srt( &frame.info_table, ev);
             }
             RET_FUN_LARGE(frame, bitmap_ref) => {
                 ev.visit_edge(frame.fun.to_address());
                 let payload : &'static ClosurePayload = &frame.payload;
                 let size : usize = bitmap_ref.size;
-                scan_large_bitmap(_tls, payload, bitmap_ref, size, ev);
-                scan_srt(_tls, &frame.info_table, ev);
+                scan_large_bitmap( payload, bitmap_ref, size, ev);
+                scan_srt( &frame.info_table, ev);
             }
             _ => panic!("Unexpected stackframe type {:?}", stackframe)
        }
@@ -214,7 +214,7 @@ pub fn scan_stack<EV: EdgeVisitor>(
 }
 
 pub fn scan_srt<EV: EdgeVisitor>(
-    _tls: VMWorkerThread,
+   // _tls: VMWorkerThread,
     ret_info_table : &StgRetInfoTable,
     ev: &mut EV,
 )
