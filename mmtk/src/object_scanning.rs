@@ -94,8 +94,10 @@ pub unsafe fn scan_mut_arr_ptrs<EV: EdgeVisitor>(
     ev: &mut EV,
 )
 {
+    // number of cards in the array
     let n_cards : StgWord = (array.n_ptrs + (1 << MUT_ARR_PTRS_CARD_BITS) - 1) 
                             >> MUT_ARR_PTRS_CARD_BITS;
+
     // scan card 0..n-1
     for m in 0..n_cards-1 {
         // m-th card, iterate through 2^MUT_ARR_PTRS_CARD_BITS many elements
