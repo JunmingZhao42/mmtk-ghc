@@ -45,6 +45,7 @@ main = do
                   (# s1#, ba# #) -> unIO (printClosureUnlifted ba#) s1#)
     mvar <- newEmptyMVar
     forkIO $ takeMVar mvar
+    printClosureUnlifted (case mvar of MVar mvar# -> mvar#)
     x <- newMVar 0
     forkIO $ do
         putMVar x 1
@@ -52,5 +53,5 @@ main = do
     threadDelay 100
     readMVar x
     putStrLn "parent done"
-    printClosureUnlifted (case mvar of MVar mvar# -> mvar#)
+    printClosureUnlifted (case x of MVar x# -> x#)
 
