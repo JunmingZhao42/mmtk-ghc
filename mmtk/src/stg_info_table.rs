@@ -54,9 +54,18 @@ impl ClosureFlag {
 /* -----------------------------------------------------------------------------
    Bitmaps
    -------------------------------------------------------------------------- */
+#[repr(C)]
 pub union Bitmap {
     pub small_bitmap       : StgSmallBitmap,
     pub large_bitmap_ref   : StgLargeBitmapRef,
+}
+
+impl std::fmt::Debug for Bitmap {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
+        unsafe {
+            write!(f, "Bitmap({:?})", self.small_bitmap)
+        }
+    }
 }
 
 // -------------------- small bitmap --------------------
@@ -109,6 +118,7 @@ impl LargeBitMapPayload {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgLargeBitmapRef {
     pub offset : StgInt
     // TODO: handle non TABLES_NEXT_TO_CODE
@@ -175,7 +185,7 @@ pub struct StgProfInfo {} // TODO: handle profiling case
 /// This is a reference to a structure which, when tables-next-to-code is enabled,
 /// lives directly before code.
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct TntcRef<T> (*const T);
 
 impl<T> TntcRef<T> {
@@ -209,8 +219,8 @@ pub type StgThunkInfoTableRef = TntcRef<StgThunkInfoTable>;
 #[derive(Debug)]
 pub struct StgInfoTable {
     // TODO: non TABLES_NEXT_TO_CODE
-    #[cfg(not(tables_next_to_code))]
-    pub code    : *const u8, // pointer to entry code
+    // #[cfg(not(tables_next_to_code))]
+    // pub code    : *const u8, // pointer to entry code
     pub prof    : StgProfInfo,
     pub layout  : StgClosureInfo,
     pub type_   : StgClosureType,
@@ -220,6 +230,7 @@ pub struct StgInfoTable {
 
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgFunInfoExtra {
     pub slow_apply  : StgInt,
     pub bitmap      : Bitmap,
@@ -232,9 +243,10 @@ pub struct StgFunInfoExtra {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct StgFunInfoTable {
-    pub f : StgFunInfoExtra,
-    pub i : StgInfoTable
+    pub f : StgFunInfoExtra, // 3 words
+    pub i : StgInfoTable     // 2 words
     // TODO: handle non TABLES_NEXT_TO_CODE (need to use StgFunInfoExtraFwd)
 }
 

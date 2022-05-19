@@ -92,7 +92,7 @@ pub enum StgClosureType {
 
 // ------------ FunTypes.h ------------
 extern "C" {
-    static stg_arg_bitmaps : [usize; 0];
+    static stg_arg_bitmaps : [usize; 29];
 }
 
 // pub struct StgFunType (StgHalfWord);

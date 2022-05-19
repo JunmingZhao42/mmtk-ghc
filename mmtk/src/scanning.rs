@@ -102,9 +102,14 @@ pub fn visit_closure<EV : EdgeVisitor>(closure_ref: TaggedClosureRef, ev: &mut E
         Closure::PartialAP(pap) => {
             ev.visit_edge(pap.fun.to_address());
             let size : usize = pap.n_args as usize;
+            // println!("pap.fun {:?}", pap.fun);
+            // println!("pap.fun.to_ptr() {:?}", pap.fun.to_ptr());
+            // println!("header infotable {:?}", unsafe{(*pap.fun.to_ptr()).header.info_table.get_ptr()}); // ptr to stg info table
+
             let fun_info : & StgFunInfoTable = 
                 StgFunInfoTable::from_info_table(pap.fun.get_info_table());
             let payload : &ClosurePayload = &pap.payload;
+            // println!("fun_info {:?}", fun_info);
             scan_PAP_payload(fun_info, payload, size, ev);
         }
         Closure::AP(ap) => {

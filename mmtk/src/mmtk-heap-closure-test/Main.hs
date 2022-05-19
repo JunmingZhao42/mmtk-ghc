@@ -34,24 +34,25 @@ printClosureUnlifted x =
 
 main :: IO ()
 main = do
-    -- printClosure (Just 42 :: Maybe Int)
-    -- printClosure ([1,2,3,4])
-    -- printClosure ("Hello" ++ "World")
-    -- printClosure (("haskell", 1))
-    -- printClosure (id :: Int -> Int)  -- (this is FUN_STATIC)
-    -- printClosure (head [42,53] :: Int)
-    -- printClosure (pap 42)
+    printClosure (Just 42 :: Maybe Int)
+    printClosure ([1,2,3,4])
+    printClosure ("Hello" ++ "World")
+    printClosure (("haskell", 1))
+    printClosure (id :: Int -> Int)  -- (this is FUN_STATIC)
+    printClosure (head [42,53] :: Int)
+    printClosure (pap 42)
     IO (\s0# -> case newByteArray# 42# s0# of
                   (# s1#, ba# #) -> unIO (printClosureUnlifted ba#) s1#)
     mvar <- newEmptyMVar
     forkIO $ takeMVar mvar
-    printClosureUnlifted (case mvar of MVar mvar# -> mvar#)
-    x <- newMVar 0
-    forkIO $ do
-        putMVar x 1
+    printClosureUnlifted (case mvar of MVar mvar# -> mvar#) -- case analysis to print: allocate a thunk
+    x <- newMVar 0 -- create Mvar with value
+    -- stack will be reachable via the heap due to the blocking queue of MVar
+    forkIO $ do -- forking a thread 
+        putMVar x 1 -- put a value in the mvar, but mvar is full, get blocked, add itself to blocking queue of Mvar
         putStrLn "child done"
     threadDelay 100
-    readMVar x
+    -- readMVar x
     putStrLn "parent done"
     printClosureUnlifted (case x of MVar x# -> x#)
 

@@ -4,6 +4,7 @@ use super::stg_closures::*;
 // use super::stg_info_table::*;
 // use super::object_scanning::*;
 use super::scanning::*;
+use super::types::*;
 
 use std::vec::*;
 
@@ -48,6 +49,7 @@ extern "C" {
 }
 
 #[no_mangle]
+/*
 pub unsafe extern "C" fn rs_collect_pointers(obj : TaggedClosureRef) { 
     // keep a common set to iterate through all closures
     // recursively visit visitor.pointers
@@ -103,5 +105,61 @@ pub unsafe extern "C" fn rs_collect_pointers(obj : TaggedClosureRef) {
         // println!();
         assert_eq!(i.to_ptr(), TaggedClosureRef::from_ptr(j as *mut StgClosure).to_ptr(), 
         "Pointers not equal to each other {:?}, {:?}", i, j);
+    }
+}
+*/
+
+pub unsafe extern "C" fn rs_collect_pointers(obj : TaggedClosureRef) { 
+    let mut visited : Vec<TaggedClosureRef> = Vec::new();
+    let mut to_visit : Vec<TaggedClosureRef> = Vec::new();
+    
+    // let mut visited_c : Vec<*const StgClosure> = Vec::new();
+    // let mut to_visit_c : Vec<*const StgClosure> = Vec::new();
+
+    to_visit.push(obj);
+    while !to_visit.is_empty() {
+        let x = to_visit.pop().expect("visitor empty but still poping element...");
+        if visited.contains(&x) {
+            continue;
+        }
+
+        // visit with Rust implementation
+        let mut visitor = CollectPointerVisitor::new();
+        visit_closure(x, &mut visitor);
+        let mut rust_ptrs = visitor.pointers;
+
+        println!("visiting this object {:?} in Rust", x.to_ptr());
+
+        // visit with C implementation
+        // let x_ptr = TaggedClosureRef::from_ptr(x as *mut StgClosure).to_ptr();
+        let mut c_ptrs : Vec<*const StgClosure> = Vec::with_capacity(heap_view_closureSize(x.to_ptr()));
+        let _n = collect_pointers(x.to_ptr(), c_ptrs.as_mut_ptr());
+        c_ptrs.set_len(_n); // update the length of the vector after visiting
+
+        rust_ptrs.sort();
+        let rust_ptrs_new : Vec<*const StgClosure> = rust_ptrs.iter().map(|x| x.to_tagged_ptr()).collect();
+        c_ptrs.sort();
+        let c_ptrs_new : Vec<*const StgClosure> = c_ptrs.iter().map(|x| TaggedClosureRef::from_ptr(*x as *mut StgClosure).to_ptr()).collect();
+
+        // TODO: have a white list to skip some closure types
+        // 1. stack
+        if x.get_info_table().type_ == StgClosureType::STACK {
+            continue;
+        }
+        
+        // check that results match
+        assert_eq!(rust_ptrs.len(), c_ptrs.len(), "Two vector not the same length");
+        assert_eq!(rust_ptrs_new, c_ptrs_new, "Rust pointers and C pointers not matching");
+
+        // for (i, j) in rust_ptrs.iter().zip(c_ptrs.into_iter()) { // into_iter will consume the array; iter gives a reference of elements
+        //     // print_obj(i);
+        //     // print_obj(TaggedClosureRef::from_ptr(j as *mut StgClosure));
+        //     // println!();
+        //     assert_eq!(i.to_ptr(), TaggedClosureRef::from_ptr(j as *mut StgClosure).to_ptr(), 
+        //     "Pointers not equal to each other {:?}, {:?}", i, j);
+        // }
+        
+        visited.push(x);
+        to_visit.append(&mut rust_ptrs);
     }
 }

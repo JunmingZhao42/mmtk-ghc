@@ -4,6 +4,7 @@ use super::stg_info_table::*;
 use super::util::*;
 use mmtk::util::{Address, ObjectReference};
 use std::mem::size_of;
+use std::fmt;
 
 
 // ------------ Closures.h ------------
@@ -188,7 +189,7 @@ pub struct StgClosure {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct TaggedClosureRef (*mut StgClosure);
 
 impl TaggedClosureRef {
@@ -198,6 +199,10 @@ impl TaggedClosureRef {
 
         let masked: usize = (self.0 as usize) & !TAG_BITS;
         masked as *const StgClosure
+    }
+
+    pub fn to_tagged_ptr(&self) -> *const StgClosure {
+        self.0
     }
 
     pub fn from_object_reference(obj : ObjectReference) -> TaggedClosureRef {
@@ -365,8 +370,8 @@ pub struct InCall {
 }
 
 #[repr(C)]
-#[derive(Debug)]
-pub struct StgTSOBlockInfo {
+// #[derive(Debug)]
+pub union StgTSOBlockInfo {
     pub closure : TaggedClosureRef,
     pub prev : *mut StgTSO,
     pub black_hole : *mut MessageBlackHole,
@@ -375,6 +380,14 @@ pub struct StgTSOBlockInfo {
     pub fd : StgInt,
     pub target : StgWord,
     // TODO: THREADED_RTS
+}
+
+impl fmt::Debug for StgTSOBlockInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        unsafe {
+            write!(f, "StgTsoBlockInfo({:?})", self.fd)
+        }
+    }
 }
 
 #[repr(C)]

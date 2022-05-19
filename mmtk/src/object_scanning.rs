@@ -30,7 +30,7 @@ pub fn scan_TSO<EV: EdgeVisitor>(
 )
 {
     // update the pointer from the InCall
-    if tso.bound.is_null() {
+    if !tso.bound.is_null() {
         unsafe {ev.visit_edge(Address::from_ptr((&*tso.bound).tso));}
     }
 
@@ -45,8 +45,13 @@ pub fn scan_TSO<EV: EdgeVisitor>(
     || tso.why_blocked == StgTSOBlocked::BLOCKED_ON_BLACK_HOLE
     || tso.why_blocked == StgTSOBlocked::BLOCKED_ON_MSG_THROW_TO
     || tso.why_blocked == StgTSOBlocked::NOT_BLOCKED {
-        ev.visit_edge(tso.block_info.closure.to_address());
+        unsafe {
+            ev.visit_edge(tso.block_info.closure.to_address());
+        }
     }
+    
+    // TODO: GC should not trace (related to weak pointer)
+    ev.visit_edge(Address::from_ptr(tso.global_link));
 
     ev.visit_edge(Address::from_ptr(tso.tso_link_prev));
     ev.visit_edge(Address::from_ptr(tso.tso_link_next));
