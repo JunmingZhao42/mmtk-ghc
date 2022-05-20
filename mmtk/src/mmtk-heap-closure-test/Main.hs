@@ -13,6 +13,11 @@ import Unsafe.Coerce
 import GHC.IO
 import GHC.MVar
 import Control.Concurrent
+import Test.QuickCheck
+import RandomHeap
+import Types.Shape
+import Types.Heap
+import Control.Monad
 
 foreign import prim "cmm_printClosure"
     cmm_printClosure :: Any -> (# #)
@@ -41,6 +46,13 @@ main = do
     printClosure (id :: Int -> Int)  -- (this is FUN_STATIC)
     printClosure (head [42,53] :: Int)
     printClosure (pap 42)
+    -- shape <- Test.QuickCheck.generate (arbitrary :: Gen Shape)
+    -- Heap heap <- toHeap shape
+    -- printClosure heap
+    replicateM_ 50 $ do
+        shape <- Test.QuickCheck.generate (arbitrary :: Gen Shape)
+        Heap heap <- RandomHeap.toHeap shape
+        printClosure heap
     -- IO (\s0# -> case newByteArray# 42# s0# of
     --               (# s1#, ba# #) -> unIO (printClosureUnlifted ba#) s1#)
     -- mvar <- newEmptyMVar

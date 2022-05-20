@@ -143,12 +143,15 @@ pub unsafe extern "C" fn rs_collect_pointers(obj : TaggedClosureRef) {
 
         // TODO: have a white list to skip some closure types
         // 1. stack
-        if x.get_info_table().type_ == StgClosureType::STACK {
-            continue;
+        match x.get_info_table().type_ {
+            StgClosureType::STACK | StgClosureType::TVAR => {
+                continue;
+            }
+            _ => ()
         }
         
         // check that results match
-        assert_eq!(rust_ptrs.len(), c_ptrs.len(), "Two vector not the same length");
+        // assert_eq!(rust_ptrs.len(), c_ptrs.len(), "Two vector not the same length");
         assert_eq!(rust_ptrs_new, c_ptrs_new, "Rust pointers and C pointers not matching");
 
         // for (i, j) in rust_ptrs.iter().zip(c_ptrs.into_iter()) { // into_iter will consume the array; iter gives a reference of elements

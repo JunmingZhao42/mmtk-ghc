@@ -14,4 +14,4 @@ Cargo.lock
 
 *.o
 *.hi
-dist-newstyle
+mmtk/src/mmtk-heap-closure-test/dist-newstyle/

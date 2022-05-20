@@ -23,5 +23,5 @@ library
 
 executable mmtk-heap-closure-test
     main-is:          Main.hs
-    build-depends:    base, mmtk-heap-closure-test
+    build-depends:    base, mmtk-heap-closure-test, random-heap, QuickCheck
     default-language: Haskell2010
