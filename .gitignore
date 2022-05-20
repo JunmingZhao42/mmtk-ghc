@@ -11,3 +11,7 @@ Cargo.lock
 # build.py & bench.sh
 /*.dylib
 /*.so
+
+*.o
+*.hi
+dist-newstyle

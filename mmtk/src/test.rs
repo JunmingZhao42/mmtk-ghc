@@ -128,7 +128,7 @@ pub unsafe extern "C" fn rs_collect_pointers(obj : TaggedClosureRef) {
         visit_closure(x, &mut visitor);
         let mut rust_ptrs = visitor.pointers;
 
-        println!("visiting this object {:?} in Rust", x.to_ptr());
+        println!("{:?}, {:?}", x.to_ptr(), x.get_info_table().type_);
 
         // visit with C implementation
         // let x_ptr = TaggedClosureRef::from_ptr(x as *mut StgClosure).to_ptr();

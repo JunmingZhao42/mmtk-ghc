@@ -1,0 +1,10 @@
+packages: .
+with-compiler: /home/junmingz/ghc_nogc/_build/stage1/bin/ghc
+
+source-repository-package
+    type: git
+    location: https://github.com/bgamari/random-heap
+    tag: master
+
+package *
+    ld-options: /home/junmingz/ghc_nogc/rts/mmtk/mmtk-ghc/mmtk/target/debug/libmmtk_ghc.a
