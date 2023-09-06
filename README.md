@@ -1,4 +1,5 @@
 # mmtk-ghc
 GHC binding for MMTk
 
-https://gitlab.haskell.org/JunmingZhao42/ghc/-/tree/mmtk/nogc2.0/rts/mmtk
+We have moved the binding development to GitHub repository:
+https://gitlab.haskell.org/JunmingZhao42/ghc/-/tree/mmtk/nonmoving4
